@@ -156,6 +156,20 @@ func registerScenes(mux *http.ServeMux, a *App) *sceneController {
 			jsonError(w, 500, "scene_save", err)
 			return
 		}
+		// Drop images whose document changed immediately, before navigation begins.
+		previous := make(map[string]sceneSource)
+		for _, source := range s.layout.Sources {
+			previous[source.ID] = source
+		}
+		for _, source := range v.Sources {
+			if old, ok := previous[source.ID]; !ok || !sameSourceDocument(old, source) {
+				delete(s.sourcePNGs, source.ID)
+			}
+			delete(previous, source.ID)
+		}
+		for id := range previous {
+			delete(s.sourcePNGs, id)
+		}
 		s.layout = v
 		select {
 		case s.wake <- struct{}{}:
@@ -164,6 +178,7 @@ func registerScenes(mux *http.ServeMux, a *App) *sceneController {
 		jsonResponse(w, 200, map[string]any{"layout": v})
 	})
 	mux.HandleFunc("GET /api/scene/frame.png", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Type", "image/png")
 		s.mu.Lock()
 		data := s.previewPNG
@@ -177,11 +192,16 @@ func registerScenes(mux *http.ServeMux, a *App) *sceneController {
 	mux.HandleFunc("GET /api/scene/source/{id}", func(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		data := s.sourcePNGs[r.PathValue("id")]
+		reason := s.status.Error
 		s.mu.Unlock()
 		if len(data) == 0 {
-			http.Error(w, "save this source to render a preview", 404)
+			if reason == "" {
+				reason = "source is loading; apply changes to render unsaved sources"
+			}
+			http.Error(w, reason, 503)
 			return
 		}
+		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Type", "image/png")
 		_, _ = w.Write(data)
 	})
@@ -260,7 +280,7 @@ func (s *sceneController) renderLoop() {
 					allocator, stopAllocator = chromedp.NewRemoteAllocator(s.ctx, endpoint)
 				}
 				t := tabs[v.ID]
-				if t != nil && (t.source.Kind != v.Kind || t.source.URL != v.URL || t.source.HTML != v.HTML || t.source.Width != v.Width || t.source.Height != v.Height) {
+				if t != nil && (!sameSourceDocument(t.source, v)) {
 					t.cancel()
 					delete(tabs, v.ID)
 					t = nil
@@ -282,7 +302,7 @@ func (s *sceneController) renderLoop() {
 						t.cancel()
 						delete(tabs, v.ID)
 						renderErr = firstErr
-						break
+						continue
 					}
 					initCtx, stop := context.WithTimeout(tc, 10*time.Second)
 					err := chromedp.Run(initCtx, chromedp.EmulateViewport(int64(v.Width), int64(v.Height)), chromedp.ActionFunc(func(ctx context.Context) error {
@@ -293,7 +313,7 @@ func (s *sceneController) renderLoop() {
 						t.cancel()
 						delete(tabs, v.ID)
 						renderErr = fmt.Errorf("%s: %w", v.Name, err)
-						break
+						continue
 					}
 				}
 				var data []byte
@@ -304,13 +324,13 @@ func (s *sceneController) renderLoop() {
 					t.cancel()
 					delete(tabs, v.ID)
 					renderErr = fmt.Errorf("%s: %w", v.Name, err)
-					break
+					continue
 				}
 				sourcePNGs[v.ID] = data
 				im, err := png.Decode(bytes.NewReader(data))
 				if err != nil {
 					renderErr = err
-					break
+					continue
 				}
 				draw.DrawMask(canvas, image.Rect(v.X, v.Y, v.X+v.Width, v.Y+v.Height), im, im.Bounds().Min, image.NewUniform(color.Alpha{A: uint8(math.Round(v.Opacity * 255))}), image.Point{}, draw.Over)
 			}
@@ -328,9 +348,10 @@ func (s *sceneController) renderLoop() {
 		}
 		s.mu.Lock()
 		if layout.Revision == s.layout.Revision {
+			s.sourcePNGs = sourcePNGs
 			if renderErr == nil {
 				s.previewPNG = out.Bytes()
-				s.sourcePNGs = sourcePNGs
+
 			}
 			s.status.Error = ""
 			if renderErr != nil {
@@ -379,4 +400,9 @@ func (s *sceneController) outputLoop() {
 		}
 		s.mu.Unlock()
 	}
+}
+
+// Geometry and opacity can change without reloading a browser document.
+func sameSourceDocument(a, b sceneSource) bool {
+	return a.Kind == b.Kind && a.URL == b.URL && a.HTML == b.HTML && a.Width == b.Width && a.Height == b.Height
 }

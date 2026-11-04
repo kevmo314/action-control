@@ -168,3 +168,33 @@ func TestAPIDispatchPreservesSourcePathValue(t *testing.T) {
 		t.Fatalf("source ID lost during dispatch: %d %q", w.Code, w.Body.String())
 	}
 }
+
+func TestSceneURLChangeDoesNotServePreviousDocument(t *testing.T) {
+	a, err := NewApp(testFilesystem(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.cancel()
+	mux := http.NewServeMux()
+	s := registerScenes(mux, a)
+	defer s.close()
+	source := sceneSource{ID: "web", Name: "Web", Kind: "url", URL: "http://127.0.0.1/old", Width: 200, Height: 80, Opacity: 1, Visible: true}
+	s.mu.Lock()
+	s.layout = sceneLayout{Revision: 2, Sources: []sceneSource{source}}
+	s.sourcePNGs = map[string][]byte{"web": []byte("previous document")}
+	s.mu.Unlock()
+	source.URL = "http://127.0.0.1/new"
+	b, _ := json.Marshal(sceneLayout{Revision: 2, Sources: []sceneSource{source}})
+	request := httptest.NewRequest("POST", "/api/scene", bytes.NewReader(b))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, request)
+	if response.Code != 200 {
+		t.Fatalf("save: %d %s", response.Code, response.Body.String())
+	}
+	response = httptest.NewRecorder()
+	mux.ServeHTTP(response, httptest.NewRequest("GET", "/api/scene/source/web", nil))
+	if response.Code != 503 || bytes.Contains(response.Body.Bytes(), []byte("previous document")) {
+		t.Fatalf("old document served after URL change: %d %s", response.Code, response.Body.String())
+	}
+}

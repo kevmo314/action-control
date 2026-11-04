@@ -147,6 +147,10 @@ func (s *livestreamController) start(config streamconfig.Config) error {
 	ctx, cancel := context.WithCancel(s.camera.app.Ctx)
 	run := &livestreamRun{cancel: cancel, done: make(chan struct{}), statusFile: filepath.Join(s.camera.app.RunDir, "livestream-status.json"), state: livestreamStatus{State: "preparing", Codec: "H.265 / HEVC", StartedAt: time.Now().UTC()}}
 	_ = os.Remove(run.statusFile)
+	// Preserve the previous frame for Studio before clearing the live file.
+	if b, err := os.ReadFile(config.PreviewFile); err == nil {
+		_ = atomicWrite(filepath.Join(s.camera.app.RunDir, "camera-background.jpg"), b, 0600)
+	}
 	_ = os.Remove(config.PreviewFile)
 	s.run, s.config = run, config
 	go s.send(ctx, run, config)
@@ -323,6 +327,24 @@ func registerLivestream(mux *http.ServeMux, c *cameraController) *livestreamCont
 			return
 		}
 		w.Header().Set("Content-Type", "image/jpeg")
+		http.ServeFile(w, r, path)
+	})
+	mux.HandleFunc("GET /api/livestream/background.jpg", func(w http.ResponseWriter, r *http.Request) {
+		// Retain a still when streaming stops. No sensor ownership or service
+		// changes are needed to display or refresh this background.
+		path := filepath.Join(c.app.RunDir, "stream-preview.jpg")
+		info, err := os.Stat(path)
+		if err != nil {
+			path = filepath.Join(c.app.RunDir, "camera-background.jpg")
+			info, err = os.Stat(path)
+		}
+		if err != nil {
+			jsonError(w, 503, "background_unavailable", errors.New("no camera frame has been captured yet"))
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Header().Set("X-Captured-At", info.ModTime().UTC().Format(time.RFC3339))
 		http.ServeFile(w, r, path)
 	})
 	mux.HandleFunc("GET /api/livestream", func(w http.ResponseWriter, r *http.Request) { jsonResponse(w, 200, s.snapshot()) })

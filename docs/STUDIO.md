@@ -3,7 +3,9 @@
 Studio stores up to four web URL or custom HTML/CSS/JavaScript sources, with
 position, size, opacity, visibility and stacking order. The camera is the locked
 background. During SRT streaming the editor shows a 640×360 JPEG camera feed
-at 2 fps; idle or unavailable capture shows a placeholder. Browser-source
+at 2 fps. When idle, it retains the last captured camera frame, labelled as a
+still; a placeholder appears only before any frame is available. Opening Studio
+does not start capture or change camera services. Browser-source
 previews come from the camera renderer. Browser sources run as independent
 pages, so they do not depend on iframe embedding permission. They have no browser
 audio in the outgoing stream. Pages requiring login need a URL that works without
@@ -11,7 +13,11 @@ an interactive login. HTML uses a separate `data:` origin.
 
 Enable **Burn scene into SRT**, save, and wait for **RENDERER READY** before
 starting a stream. Studio renders saved browser sources even when burn-in is off.
-Placement and opacity preview immediately; save URL/HTML changes to render them.
+Placement and opacity preview immediately; use **Apply changes** beside the URL
+or **Save scene** to render document changes. Editing a document hides its old
+preview; saving clears that source's cached image before navigation begins.
+Failed URLs show a loading/error state instead of the previous document. Other
+healthy sources continue to refresh when a source fails.
 The preview is separate from the stream layer, so disabling burn-in clears the
 stream even if a preview page stalls. Source changes apply after saving, including during a stream
 started with overlays enabled. Disabling and saving clears the layer. A stream
