@@ -30,7 +30,7 @@
         "white-balance-mode",
         "manual-wb-settings"
       ],
-      "options": "Auto/manual shutter; advertised ISO 100–51200; compensation -24..24 steps; 50/60 Hz/auto anti-flicker; WB presets/lock/manual temperature or RGB gains.",
+      "options": "Auto/manual shutter; advertised ISO 100\u201351200; compensation -24..24 steps; 50/60 Hz/auto anti-flicker; WB presets/lock/manual temperature or RGB gains.",
       "boundary": "The plugin says control-mode=auto disables manual capture parameters. Validate each setting together with control-mode. Manual WB is a vendor structure needing field verification. Exposure steps are not assumed to equal EV."
     },
     {
@@ -44,7 +44,7 @@
         "noise-reduction",
         "adrc"
       ],
-      "options": "Contrast 1–10, saturation 0–10, sharpness 0–6, NR off/fast/hq, dynamic-range compression on/off.",
+      "options": "Contrast 1\u201310, saturation 0\u201310, sharpness 0\u20136, NR off/fast/hq, dynamic-range compression on/off.",
       "boundary": "Test the actual image effect and latency on AC204; metadata alone is not proof."
     },
     {
@@ -183,7 +183,17 @@
     "local_30s_end_delta_ms": -4.366,
     "buffered_srt_run_seconds": 65,
     "buffered_srt_start_delta_ms": 29.611,
-    "interpretation": "Timestamp alignment only. Physical lip-sync, long-term drift and DJI wireless buffering need an audible/visible reference test. Receiver shutdown tail truncation is excluded from drift conclusions."
+    "interpretation": "Timestamp alignment only. Physical lip-sync, long-term drift and DJI wireless buffering need an audible/visible reference test. Receiver shutdown tail truncation is excluded from drift conclusions.",
+    "neural_dji_compensation_ms": 128,
+    "neural_rnnoise_compensation_ms": 20,
+    "neural_dji_received_srt": {
+      "duration_seconds": 41,
+      "start_audio_after_video_ms": 50.378,
+      "end_audio_before_video_ms": 22.423,
+      "aac_packet_count": 1920,
+      "aac_packet_spacing_ms": 21.333,
+      "audio_timestamp_gaps": false
+    }
   },
   "sources": {
     "capture_properties": "streamer-plugin-properties.json",
@@ -191,10 +201,9 @@
   },
   "not_implemented": [
     "EIS/RockSteady/Horizon presets",
-    "DJI APU audio processing",
     "Wireless mic UI telemetry/control setters",
-    "D-Log/HDR/Main10 presets",
     "Adaptive bitrate policy",
-    "Hardware-calibrated per-microphone A/V offsets"
+    "Hardware-calibrated per-microphone A/V offsets",
+    "Full DJI APU beamforming / AGC chain"
   ]
 }

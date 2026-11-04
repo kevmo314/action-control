@@ -52,6 +52,7 @@ export function StudioPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [tick, setTick] = useState(0);
+  const [cameraVisible, setCameraVisible] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (state.data && !layout) setLayout(state.data.layout);
@@ -212,14 +213,25 @@ export function StudioPage() {
               className="relative aspect-video touch-none select-none overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-black"
               onPointerDown={() => setSelected("")}
             >
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-500">
-                <Camera className="size-12" />
-                <span className="text-sm">Camera background</span>
-                <span className="text-xs">
-                  Live camera preview unavailable · camera video is present in
-                  SRT
-                </span>
-              </div>
+              {stream.data?.running && (
+                <img
+                  src={`/api/livestream/preview.jpg?t=${tick}`}
+                  alt="Live camera background"
+                  className="pointer-events-none absolute inset-0 size-full object-fill"
+                  style={{ visibility: cameraVisible ? "visible" : "hidden" }}
+                  onLoad={() => setCameraVisible(true)}
+                  onError={() => setCameraVisible(false)}
+                />
+              )}
+              {(!stream.data?.running || !cameraVisible) && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-500">
+                  <Camera className="size-12" />
+                  <span className="text-sm">Camera background</span>
+                  <span className="text-xs">
+                    Start an SRT stream to preview the camera here
+                  </span>
+                </div>
+              )}
               {layout?.sources.map(
                 (v, i) =>
                   v.visible && (

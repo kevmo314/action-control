@@ -19,6 +19,10 @@ import (
 // Opaque GStreamer handles avoid depending on private vendor struct layouts.
 // Functions are from the stable GStreamer 1.x C ABI.
 type gstAPI struct {
+	probeEvent        func(uintptr) uintptr
+	eventUnref        func(uintptr)
+	newAllocate       func(uintptr, uintptr, uintptr) uintptr
+	padPush           func(uintptr, uintptr) int32
 	init              func(uintptr, uintptr, *uintptr) int32
 	parse             func(string, *uintptr) uintptr
 	getByName         func(uintptr, string) uintptr
@@ -40,6 +44,12 @@ type gstAPI struct {
 	setStringProperty func(uintptr, string, string, uintptr)
 	newEOS            func() uintptr
 	sendEvent         func(uintptr, uintptr) int32
+	getStaticPad      func(uintptr, string) uintptr
+	addProbe          func(uintptr, uint32, uintptr, uintptr, uintptr) uint64
+	removeProbe       func(uintptr, uint64)
+	probeBuffer       func(uintptr) uintptr
+	miniWritable      func(uintptr) int32
+	fill              func(uintptr, uintptr, unsafe.Pointer, uintptr) uintptr
 }
 
 var gst gstAPI
@@ -80,6 +90,8 @@ func initGST() error {
 			{&gst.messageUnref, core, "gst_message_unref"}, {&gst.errorFree, glib, "g_error_free"}, {&gst.free, glib, "g_free"},
 			{&gst.getProperty, libs["libgobject-2.0.so.0"], "g_object_get"},
 			{&gst.setStringProperty, libs["libgobject-2.0.so.0"], "g_object_set"},
+			{&gst.probeEvent, core, "gst_pad_probe_info_get_event"}, {&gst.eventUnref, core, "gst_event_unref"}, {&gst.newAllocate, core, "gst_buffer_new_allocate"}, {&gst.padPush, core, "gst_pad_push"},
+			{&gst.getStaticPad, core, "gst_element_get_static_pad"}, {&gst.addProbe, core, "gst_pad_add_probe"}, {&gst.removeProbe, core, "gst_pad_remove_probe"}, {&gst.probeBuffer, core, "gst_pad_probe_info_get_buffer"}, {&gst.miniWritable, core, "gst_mini_object_is_writable"}, {&gst.fill, core, "gst_buffer_fill"},
 			{&gst.newEOS, core, "gst_event_new_eos"}, {&gst.sendEvent, core, "gst_element_send_event"},
 		} {
 			purego.RegisterLibFunc(symbol.target, symbol.lib, symbol.name)
@@ -121,6 +133,9 @@ func cString(p uintptr) string {
 }
 
 type Capture struct {
+	preview                  uintptr
+	previewFile              string
+	lastPreviewCheck         time.Time
 	pipeline, sink, bus, mic uintptr
 	overlay                  uintptr
 	overlayFrame             string
@@ -129,11 +144,17 @@ type Capture struct {
 	audioSource              string
 	lastAudioCheck           time.Time
 	ending                   bool
+	wind                     *audioProcessor
 }
 
 func Open(c Config, testPattern bool) (*Capture, error) {
 	if err := initGST(); err != nil {
 		return nil, err
+	}
+	if c.AudioSource == "regular0" {
+		if err := checkedFile("/usr/lib/pulse-15.0/modules/module-qal-card.so", "5e1f79d3c8edc10d58874842d47bcd0ca4dbda63e4f919f70c77beb48ff79edf"); err != nil {
+			return nil, err
+		}
 	}
 	var detail uintptr
 	pipeline := gst.parse(c.Pipeline(testPattern), &detail)
@@ -149,6 +170,14 @@ func Open(c Config, testPattern bool) (*Capture, error) {
 	s := &Capture{pipeline: pipeline}
 	s.sink = gst.getByName(pipeline, "encoded")
 	s.bus = gst.getBus(pipeline)
+	if c.PreviewFile != "" {
+		s.preview = gst.getByName(pipeline, "preview")
+		s.previewFile = c.PreviewFile
+		if s.preview == 0 {
+			s.Close()
+			return nil, errors.New("camera preview element unavailable")
+		}
+	}
 	if c.OverlayFrame != "" {
 		s.overlay = gst.getByName(pipeline, "sceneoverlay")
 		s.overlayFrame = c.OverlayFrame
@@ -164,6 +193,22 @@ func Open(c Config, testPattern bool) (*Capture, error) {
 	if s.sink == 0 || s.bus == 0 {
 		s.Close()
 		return nil, errors.New("encoded output unavailable")
+	}
+	if c.NeuralAudio() {
+		if c.AudioSource != "regular0" {
+			s.Close()
+			return nil, errors.New("neural noise reduction requires the internal microphone")
+		}
+		processor, err := openAudioProcessor(c.NoiseMode())
+		if err != nil {
+			s.Close()
+			return nil, err
+		}
+		s.wind = processor
+		if err = processor.attach(pipeline); err != nil {
+			s.Close()
+			return nil, err
+		}
 	}
 	if gst.setState(pipeline, 4) == 0 {
 		err := s.nativeError()
@@ -206,6 +251,15 @@ func (s *Capture) Read(ctx context.Context) ([]byte, error) {
 			if !info.ModTime().Equal(s.overlayModified) {
 				gst.setStringProperty(s.overlay, "location", s.overlayFrame, 0)
 				s.overlayModified = info.ModTime()
+			}
+		}
+		if s.preview != 0 && time.Since(s.lastPreviewCheck) > 200*time.Millisecond {
+			s.lastPreviewCheck = time.Now()
+			s.updatePreview()
+		}
+		if s.wind != nil {
+			if err := s.wind.failure(); err != nil {
+				return nil, err
 			}
 		}
 		if err := s.nativeError(); err != nil {
@@ -252,7 +306,11 @@ func (s *Capture) Close() {
 	if s.pipeline != 0 {
 		gst.setState(s.pipeline, 1)
 	} // GST_STATE_NULL
-	for _, h := range []uintptr{s.overlay, s.mic, s.sink, s.bus, s.pipeline} {
+	if s.wind != nil {
+		s.wind.close()
+		s.wind = nil
+	}
+	for _, h := range []uintptr{s.preview, s.overlay, s.mic, s.sink, s.bus, s.pipeline} {
 		if h != 0 {
 			gst.unref(h)
 		}
@@ -260,7 +318,35 @@ func (s *Capture) Close() {
 	s.sink, s.bus, s.pipeline = 0, 0, 0
 	s.mic = 0
 	s.overlay = 0
+	s.preview = 0
 }
 
 // End flushes the encoders and muxer before the transport is closed.
 func (s *Capture) End() { s.ending = true; gst.sendEvent(s.pipeline, gst.newEOS()) }
+
+func (s *Capture) AudioStats() ProcessorStats {
+	if s.wind == nil {
+		return ProcessorStats{}
+	}
+	return s.wind.stats()
+}
+
+func (s *Capture) updatePreview() {
+	sample := gst.pull(s.preview, 0)
+	if sample == 0 {
+		return
+	}
+	defer gst.sampleUnref(sample)
+	buf := gst.getBuffer(sample)
+	size := gst.getSize(buf)
+	if size == 0 || size > 1<<20 {
+		return
+	}
+	data := make([]byte, int(size))
+	if gst.extract(buf, 0, unsafe.Pointer(&data[0]), size) != size {
+		return
+	}
+	if os.WriteFile(s.previewFile+".tmp", data, 0600) == nil {
+		_ = os.Rename(s.previewFile+".tmp", s.previewFile)
+	}
+}

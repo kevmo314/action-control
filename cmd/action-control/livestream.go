@@ -16,14 +16,15 @@ import (
 )
 
 type livestreamStatus struct {
-	State       string    `json:"state"`
-	Codec       string    `json:"codec"`
-	Bytes       uint64    `json:"bytes"`
-	StartedAt   time.Time `json:"started_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	Error       string    `json:"error,omitempty"`
-	AudioSource string    `json:"audio_source"`
-	AudioCodec  string    `json:"audio_codec"`
+	AudioProcessing streamconfig.ProcessorStats `json:"audio_processing"`
+	State           string                      `json:"state"`
+	Codec           string                      `json:"codec"`
+	Bytes           uint64                      `json:"bytes"`
+	StartedAt       time.Time                   `json:"started_at"`
+	UpdatedAt       time.Time                   `json:"updated_at"`
+	Error           string                      `json:"error,omitempty"`
+	AudioSource     string                      `json:"audio_source"`
+	AudioCodec      string                      `json:"audio_codec"`
 }
 type livestreamRun struct {
 	cancel     context.CancelFunc
@@ -98,6 +99,7 @@ func (s *livestreamController) snapshot() any {
 
 func (s *livestreamController) start(config streamconfig.Config) error {
 	// Only our renderer may supply a file path, never an HTTP client.
+	config.PreviewFile = filepath.Join(s.camera.app.RunDir, "stream-preview.jpg")
 	config.OverlayFrame = ""
 	frame, sceneErr := s.scene.prepare()
 	if sceneErr != nil {
@@ -112,6 +114,21 @@ func (s *livestreamController) start(config streamconfig.Config) error {
 		return err
 	}
 	a.cancel()
+	if config.NeuralAudio() {
+		query, stop := context.WithTimeout(s.camera.app.Ctx, 3*time.Second)
+		sources, e := streamconfig.AudioSources(query)
+		stop()
+		if e != nil {
+			return e
+		}
+		config.AudioSource, e = streamconfig.ResolveAudioSource(config.AudioSource, sources)
+		if e != nil {
+			return e
+		}
+		if e = config.Validate(); e != nil {
+			return e
+		}
+	}
 	if _, err = s.program(); err != nil {
 		return err
 	}
@@ -130,6 +147,7 @@ func (s *livestreamController) start(config streamconfig.Config) error {
 	ctx, cancel := context.WithCancel(s.camera.app.Ctx)
 	run := &livestreamRun{cancel: cancel, done: make(chan struct{}), statusFile: filepath.Join(s.camera.app.RunDir, "livestream-status.json"), state: livestreamStatus{State: "preparing", Codec: "H.265 / HEVC", StartedAt: time.Now().UTC()}}
 	_ = os.Remove(run.statusFile)
+	_ = os.Remove(config.PreviewFile)
 	s.run, s.config = run, config
 	go s.send(ctx, run, config)
 	return nil
@@ -293,6 +311,19 @@ func (s *livestreamController) stop() error {
 func registerLivestream(mux *http.ServeMux, c *cameraController) *livestreamController {
 	s := &livestreamController{camera: c, config: streamconfig.DefaultConfig(), last: livestreamStatus{State: "stopped", Codec: "H.265 / HEVC"}}
 	s.scene = registerScenes(mux, c.app)
+	mux.HandleFunc("GET /api/livestream/preview.jpg", func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		active := s.run != nil
+		s.mu.Unlock()
+		path := filepath.Join(c.app.RunDir, "stream-preview.jpg")
+		info, e := os.Stat(path)
+		if !active || e != nil || time.Since(info.ModTime()) > 3*time.Second {
+			jsonError(w, 503, "preview_unavailable", errors.New("camera preview is available while streaming"))
+			return
+		}
+		w.Header().Set("Content-Type", "image/jpeg")
+		http.ServeFile(w, r, path)
+	})
 	mux.HandleFunc("GET /api/livestream", func(w http.ResponseWriter, r *http.Request) { jsonResponse(w, 200, s.snapshot()) })
 	mux.HandleFunc("GET /api/livestream/audio", func(w http.ResponseWriter, r *http.Request) {
 		a, err := s.device()

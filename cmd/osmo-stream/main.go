@@ -20,14 +20,15 @@ import (
 )
 
 type status struct {
-	State       string    `json:"state"`
-	Codec       string    `json:"codec"`
-	Bytes       uint64    `json:"bytes"`
-	StartedAt   time.Time `json:"started_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	Error       string    `json:"error,omitempty"`
-	AudioSource string    `json:"audio_source"`
-	AudioCodec  string    `json:"audio_codec"`
+	AudioProcessing hwstream.ProcessorStats `json:"audio_processing"`
+	State           string                  `json:"state"`
+	Codec           string                  `json:"codec"`
+	Bytes           uint64                  `json:"bytes"`
+	StartedAt       time.Time               `json:"started_at"`
+	UpdatedAt       time.Time               `json:"updated_at"`
+	Error           string                  `json:"error,omitempty"`
+	AudioSource     string                  `json:"audio_source"`
+	AudioCodec      string                  `json:"audio_codec"`
 }
 
 func main() {
@@ -70,6 +71,9 @@ func run() (err error) {
 	st.AudioSource = c.AudioSource
 	if c.AudioSource != "none" && c.AudioSource != "" {
 		st.AudioCodec = "AAC-LC 48 kHz stereo"
+		if c.NeuralAudio() {
+			st.AudioCodec = "AAC-LC 48 kHz mono"
+		}
 	}
 	writeStatus := func() {
 		st.UpdatedAt = time.Now().UTC()
@@ -89,6 +93,7 @@ func run() (err error) {
 		}
 		writeStatus()
 	}()
+	var initialAudio *streamconfig.AudioSource
 	if c.AudioSource != "none" && c.AudioSource != "" {
 		query, stop := context.WithTimeout(ctx, 3*time.Second)
 		sources, e := streamconfig.AudioSources(query)
@@ -100,6 +105,18 @@ func run() (err error) {
 		if e != nil {
 			return e
 		}
+		for _, source := range sources {
+			if source.Name == c.AudioSource {
+				v := source
+				initialAudio = &v
+			}
+		}
+		if c.AudioSource == "regular0" && (initialAudio == nil || initialAudio.ActivePort != "handset-mic" || initialAudio.SampleSpec != "s24-32le 4ch 48000Hz") {
+			return errors.New("unsupported internal microphone format or route")
+		}
+	}
+	if e := c.Validate(); e != nil {
+		return e
 	}
 	st.AudioSource = c.AudioSource
 	var dest io.WriteCloser
@@ -181,10 +198,18 @@ func run() (err error) {
 			if _, e = streamconfig.ResolveAudioSource(c.AudioSource, sources); e != nil {
 				return e
 			}
+			if initialAudio != nil {
+				for _, current := range sources {
+					if current.Name == c.AudioSource && (current.ActivePort != initialAudio.ActivePort || current.SampleSpec != initialAudio.SampleSpec || current.ChannelMap != initialAudio.ChannelMap) {
+						return errors.New("microphone format or route changed; stream stopped")
+					}
+				}
+			}
 			lastMicCheck = time.Now()
 		}
 		readCtx, stop := context.WithTimeout(readParent, 10*time.Second)
 		data, e := capture.Read(readCtx)
+		st.AudioProcessing = capture.AudioStats()
 		stop()
 		if e != nil {
 			if draining {

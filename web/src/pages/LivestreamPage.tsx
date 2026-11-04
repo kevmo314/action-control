@@ -27,6 +27,7 @@ type StreamConfig = {
   audio_source: string;
   image_mode?: string;
   wind_filter?: boolean;
+  noise_reduction?: string;
 };
 type AudioSource = {
   name: string;
@@ -58,6 +59,13 @@ type StreamState = {
     error?: string;
     audio_source?: string;
     audio_codec?: string;
+    audio_processing?: {
+      mode: string;
+      compensated_delay_ms: number;
+      average_ms: number;
+      max_ms: number;
+      frames: number;
+    };
   };
 };
 const labels: Record<string, string> = {
@@ -413,24 +421,47 @@ export function LivestreamPage() {
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="stream-wind">Wind rumble filter</Label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        id="stream-wind"
-                        type="checkbox"
-                        disabled={disabled || draft.audio_source === "none"}
-                        checked={draft.wind_filter ?? false}
-                        onChange={(e) =>
-                          update({ wind_filter: e.target.checked })
-                        }
-                      />
-                      Reduce low-frequency wind rumble
-                    </label>
+                    <Label htmlFor="stream-wind">Noise reduction</Label>
+                    <Select
+                      disabled={disabled || draft.audio_source === "none"}
+                      value={
+                        draft.noise_reduction ||
+                        (draft.wind_filter ? "highpass" : "off")
+                      }
+                      onValueChange={(noise_reduction) =>
+                        update({ noise_reduction, wind_filter: false })
+                      }
+                    >
+                      <SelectTrigger id="stream-wind" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="off">Off</SelectItem>
+                        <SelectItem value="highpass">
+                          Wind rumble · 180 Hz high-pass
+                        </SelectItem>
+                        <SelectItem value="dji">
+                          DJI neural · internal mic
+                        </SelectItem>
+                        <SelectItem value="rnnoise">
+                          RNNoise small · internal mic
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                     <p className="text-xs text-muted-foreground">
-                      180 Hz high-pass filter on the selected mic. This is
-                      separate from DJI’s neural wind reduction. Wireless mic
-                      pairing and gain remain unchanged.
+                      Neural modes process the internal mic in mono and
+                      compensate their audio delay (DJI: 128 ms, RNNoise: 20
+                      ms). Wireless mic channels, pairing, and gain are
+                      preserved.
                     </p>
+                    {active && st?.audio_processing?.mode && (
+                      <p className="text-xs text-muted-foreground">
+                        {st.audio_processing.mode}:{" "}
+                        {st.audio_processing.average_ms.toFixed(2)} ms per block
+                        · {st.audio_processing.compensated_delay_ms} ms delay
+                        compensated
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="mt-4 rounded-lg border p-3 text-xs text-muted-foreground">

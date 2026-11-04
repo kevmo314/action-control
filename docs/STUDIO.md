@@ -2,8 +2,9 @@
 
 Studio stores up to four web URL or custom HTML/CSS/JavaScript sources, with
 position, size, opacity, visibility and stacking order. The camera is the locked
-background. The editor currently uses a placeholder for camera video; its browser
-source preview comes from the camera renderer. Browser sources run as independent
+background. During SRT streaming the editor shows a 640×360 JPEG camera feed
+at 2 fps; idle or unavailable capture shows a placeholder. Browser-source
+previews come from the camera renderer. Browser sources run as independent
 pages, so they do not depend on iframe embedding permission. They have no browser
 audio in the outgoing stream. Pages requiring login need a URL that works without
 an interactive login. HTML uses a separate `data:` origin.
@@ -73,6 +74,8 @@ runtime when available. Neither launcher adds a boot hook.
 | Sensor HDR | Experimental: `shdr` + `shdr-enable`; valid 8-bit output, 178 frames / ~5.97 s; dynamic range improvement not verified |
 | Low light | Experimental: `op-mode=lowlight` + `viull-enable`; valid 8-bit output, 177 frames / ~5.94 s; processing effect not verified in a dark scene |
 | Wind rumble filter | 180 Hz four-pole Chebyshev high-pass before AAC, applied only to the selected input; not DJI neural wind removal |
+| DJI neural wind reduction | Internal mic, mono 48 kHz; 1024-sample blocks, 128 ms model delay compensated in PTS; firmware hashes checked |
+| RNNoise small | Internal mic, mono 48 kHz; 480-sample blocks, 20 ms model delay compensated in PTS; optional sidecar library |
 | RockSteady / Horizon correction | Not available in custom capture yet; see below |
 
 Advanced modes are limited to 1080p30 pending further testing. Browser overlays
@@ -95,9 +98,48 @@ varies by mode). Enabling the generic flag is therefore deliberately not offered
 as RockSteady or Horizon correction. Those require integration of DJI's graph
 selection and metadata setup; a successful bitstream alone would not verify them.
 
-DJI's APU has its own neural wind-noise functions, but the current PulseAudio
-capture path does not own an APU processing instance. The standard filter is
-exposed under its actual name rather than claiming to activate that processing.
+### Internal microphone and timing
+
+The inspected PulseAudio `regular0` source advertises four S24_32LE channels,
+but its buffers contain three signed-16 microphone lanes and a metadata lane.
+Implicit PulseAudio conversion made capture roughly 48 dB too quiet. Capture
+now requests that native format, excludes metadata, normalizes the PCM, and
+mixes the three microphones before optional processing. This adapter is gated
+by the inspected PulseAudio module hash and handset-mic format/route. Pairing,
+input gain and mute are unchanged; source/port/format changes stop the stream.
+Wireless inputs retain their original path and are rejected for neural modes.
+This is a software mix, not DJI's full microphone-array beamformer/AGC chain.
+
+DJI mode calls the stock `dji_audio_nn_*` API in the sender process. RNNoise uses
+a separately built small-model ARM64 library. Both discard initial delayed
+output, subtract their measured algorithmic delay from audio PTS/DTS, and push
+zero-input blocks before EOS to recover the audio tail. No Python process is
+needed for streaming. The UI reports processing mean/max cost and compensation.
+
+Audio uses `provide-clock=false`, following the common GStreamer pipeline clock
+with the installed source's default `skew` clock-slaving behavior. Video uses
+HEVC with no B frames. AAC and HEVC timestamps are retained in the same MPEG-TS
+and SRT connection. Encoder buffering changes delivery latency; content still
+uses its capture timeline. SRT does not measure physical audio/video alignment.
+
+A received ~41-second 720p30 DJI-neural recording after the PCM fix contained
+1920 consecutive AAC packets, spaced 21.333 ms, with no audio timestamp gaps.
+The first audio PTS was 50.378 ms after the first video PTS; their last packet
+ends were 22.423 ms apart. A prior shorter DJI run started within 5.4 ms, so
+startup alignment varies; these checks establish timestamp continuity, not a
+calibrated sensor-to-speaker offset. Unit tests cover one minute of both model
+timelines, warmup removal, timestamp underflow, and tail duration. Physical
+lip-sync, long-term clock drift and wireless-mic latency remain unmeasured.
+
+For the same 7.54-second recorded internal-mic input, native processing averaged
+0.71 ms / 1024-sample block for DJI (~3.3% of one CPU) and 0.44 ms / 480-sample
+block for RNNoise small (~4.4%). Peak process RSS was about 46 / 20 MiB. During
+live HEVC + JPEG preview, DJI averaged 3.69 ms per block, max 10.10 ms, against a
+21.33 ms block budget. These are compute measurements, not speech quality scores.
+The room recording has no clean reference, so PESQ/STOI scores are not asserted.
+`tools/probe-audio-processors.py` compares both native processors on a saved mono
+S16LE/48 kHz input; its output retains algorithmic delay for offline alignment.
+Real room recordings and proprietary firmware files stay outside this repo.
 
 ## Verification on the connected camera
 

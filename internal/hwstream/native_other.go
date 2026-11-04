@@ -17,3 +17,5 @@ func (*Capture) Read(context.Context) ([]byte, error) {
 }
 func (*Capture) Close() {}
 func (*Capture) End()   {}
+
+func (*Capture) AudioStats() ProcessorStats { return ProcessorStats{} }

@@ -3,7 +3,7 @@
 This fork has an English web interface and a **Livestreaming** page for a small
 Go SRT sender. It captures sensor frames through the stock QMMF plugin, uses
 Codec2 hardware H.265 encoding, and sends MPEG-TS directly from Go. Microphone
-audio is encoded as AAC-LC, 48 kHz stereo, 128 kbps. It does not use Mimo preview,
+audio is encoded as AAC-LC, 48 kHz, 128 kbps (stereo, or mono with neural reduction). It does not use Mimo preview,
 DJI's livestream service, `gst-launch`, or an FFmpeg subprocess.
 
 The camera must be idle before starting. The console temporarily stops only
@@ -17,14 +17,17 @@ automatic preference for DJI wireless mics, and video only. Pair DJI transmitter
 using the camera settings. Selection is pinned at start; a disconnected or
 rerouted input stops the stream instead of choosing another microphone.
 Internal audio has been tested. DJI wireless PCM capture and dual-transmitter
-channel mapping still require a connected transmitter test. Internal capture
-currently bypasses DJI's APU wind-noise/AGC processing.
+channel mapping still require a connected transmitter test. Internal capture offers DJI neural wind reduction and RNNoise small, alongside
+off and a 180 Hz high-pass filter. Neural modes are mono and internal-mic only;
+they compensate measured model delay and drain buffered audio on stop. This
+does not reproduce DJI's full APU beamforming / gain-control chain.
 
 The **Studio** page adds editable browser URL / HTML overlays, rendered on the
 camera and burned into outgoing SRT. Livestreaming also offers 10-bit Rec. 709,
-experimental D-Log M / sensor HDR / low-light modes, and a wind-rumble filter.
+experimental D-Log M / sensor HDR / low-light modes, and noise reduction.
+Studio shows a 640×360 camera background at 2 fps while streaming.
 See [Studio setup, verified limits, and processing research](docs/STUDIO.md).
-RockSteady / Horizon correction and DJI neural wind removal are not integrated.
+RockSteady / Horizon correction remain unavailable in custom capture.
 
 Build the English interface and the two executables:
 
@@ -40,6 +43,10 @@ CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o bui
 Place `osmo-stream` beside the console executable, or in its installed `bin/`
 directory. The sender dynamically loads the camera's existing GStreamer 1.x
 libraries. The console remains static. The release builder includes the sender.
+For optional RNNoise small, run `tools/build-rnnoise.sh` (Docker + Git), then place
+its `librnnoise-small.so` and `RNNOISE-LICENSE` beside `osmo-stream`. DJI neural
+mode loads the camera's existing firmware libraries and encrypted model; it is
+gated to the inspected firmware hashes.
 For an isolated trial, run the console with a temporary `--root` and a loopback
 `--listen`; Livestreaming independently verifies the real camera before allowing
 a sensor handoff.

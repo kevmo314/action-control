@@ -108,3 +108,21 @@ func TestAdvancedModeHandoffConstraints(t *testing.T) {
 		t.Fatal("unknown processing mode accepted")
 	}
 }
+
+func TestNeuralProcessingNeverTakesWirelessChannels(t *testing.T) {
+	for _, mode := range []string{"dji", "rnnoise"} {
+		c := DefaultConfig()
+		c.Address = "receiver:9000"
+		c.NoiseReduction = mode
+		c.AudioSource = "regular0"
+		if err := c.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		for _, source := range []string{"source.wireless-mic", "bluez_source.generic", "none"} {
+			c.AudioSource = source
+			if c.Validate() == nil {
+				t.Fatalf("%s accepted %s", mode, source)
+			}
+		}
+	}
+}

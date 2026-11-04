@@ -11,25 +11,49 @@ import (
 )
 
 type Config struct {
-	Address      string `json:"address"`
-	StreamID     string `json:"stream_id"`
-	Passphrase   string `json:"passphrase,omitempty"`
-	LatencyMS    int    `json:"latency_ms"`
-	Width        int    `json:"width"`
-	Height       int    `json:"height"`
-	FPS          int    `json:"fps"`
-	BitrateKbps  int    `json:"bitrate_kbps"`
-	AudioSource  string `json:"audio_source"`
-	ImageMode    string `json:"image_mode,omitempty"`
-	WindFilter   bool   `json:"wind_filter"`
-	OverlayFrame string `json:"overlay_frame,omitempty"`
+	PreviewFile    string `json:"preview_file,omitempty"`
+	Address        string `json:"address"`
+	StreamID       string `json:"stream_id"`
+	Passphrase     string `json:"passphrase,omitempty"`
+	LatencyMS      int    `json:"latency_ms"`
+	Width          int    `json:"width"`
+	Height         int    `json:"height"`
+	FPS            int    `json:"fps"`
+	BitrateKbps    int    `json:"bitrate_kbps"`
+	AudioSource    string `json:"audio_source"`
+	ImageMode      string `json:"image_mode,omitempty"`
+	NoiseReduction string `json:"noise_reduction,omitempty"`
+	WindFilter     bool   `json:"wind_filter"`
+	OverlayFrame   string `json:"overlay_frame,omitempty"`
 }
 
 func DefaultConfig() Config {
 	return Config{LatencyMS: 1000, Width: 1280, Height: 720, FPS: 30, BitrateKbps: 4000, AudioSource: "auto"}
 }
 
+func (c Config) NeuralAudio() bool { return c.NoiseMode() == "dji" || c.NoiseMode() == "rnnoise" }
+func (c Config) NoiseMode() string {
+	if c.NoiseReduction != "" {
+		return c.NoiseReduction
+	}
+	if c.WindFilter {
+		return "highpass"
+	}
+	return "off"
+}
 func (c Config) Validate() error {
+	switch c.NoiseMode() {
+	case "off", "highpass", "dji", "rnnoise":
+	default:
+		return errors.New("unsupported noise reduction mode")
+	}
+	if c.NeuralAudio() && c.AudioSource != "regular0" && c.AudioSource != "auto" {
+		return errors.New("neural noise reduction requires the internal microphone")
+	}
+
+	if c.PreviewFile != "" && (!strings.HasPrefix(c.PreviewFile, "/") || strings.ContainsAny(c.PreviewFile, "\"\\\r\n\x00")) {
+		return errors.New("invalid preview path")
+	}
 	switch c.ImageMode {
 	case "", "standard", "10bit", "dlogm", "shdr", "lowlight":
 	default:
@@ -100,14 +124,43 @@ func (c Config) Pipeline(testPattern bool) string {
 	if c.OverlayFrame != "" {
 		overlay = fmt.Sprintf("gdkpixbufoverlay name=sceneoverlay location=\"%s\" overlay-width=%d overlay-height=%d ! ", c.OverlayFrame, c.Width, c.Height)
 	}
-	video := fmt.Sprintf("%s ! video/x-raw,format=%s,width=%d,height=%d,framerate=%d/1%s ! %sdjicamc2venc control-rate=constant target-bitrate=%d idr-interval=%d b-frames=0 ! video/x-h265,stream-format=byte-stream,alignment=au ! h265parse config-interval=-1 ! queue max-size-buffers=16 ! mux. ", source, format, c.Width, c.Height, c.FPS, colorimetry, overlay, c.BitrateKbps*1000, c.FPS)
+	split, preview := "", ""
+	if c.PreviewFile != "" {
+		split = "tee name=sensor ! queue max-size-buffers=4 max-size-bytes=0 max-size-time=0 ! "
+		preview = "sensor. ! queue leaky=downstream max-size-buffers=1 max-size-bytes=0 max-size-time=0 ! videorate drop-only=true ! video/x-raw,framerate=2/1 ! videoscale ! video/x-raw,width=640,height=360 ! videoconvert ! video/x-raw,format=I420 ! jpegenc quality=70 ! appsink name=preview sync=false max-buffers=1 drop=true wait-on-eos=false "
+	}
+	video := fmt.Sprintf("%s ! video/x-raw,format=%s,width=%d,height=%d,framerate=%d/1%s ! %s%sdjicamc2venc control-rate=constant target-bitrate=%d idr-interval=%d b-frames=0 ! video/x-h265,stream-format=byte-stream,alignment=au ! h265parse config-interval=-1 ! queue max-size-buffers=16 ! mux. ", source, format, c.Width, c.Height, c.FPS, colorimetry, split, overlay, c.BitrateKbps*1000, c.FPS)
 	audio := ""
 	if c.AudioSource != "" && c.AudioSource != "none" && c.AudioSource != "auto" {
+		capture := fmt.Sprintf("pulsesrc name=mic device=%s provide-clock=false client-name=osmo-stream", c.AudioSource)
+		if c.AudioSource == "regular0" {
+			// This firmware's PAL source contains three signed-16 PCM lanes in
+			// 32-bit containers plus one metadata lane. Avoid PulseAudio remixing
+			// the metadata, and normalize the PCM to the advertised 24-bit scale.
+			capture += " ! audio/x-raw,format=S24_32LE,rate=48000,channels=4 ! audioconvert ! audio/x-raw,format=F32LE,channels=4 ! audiomixmatrix in-channels=4 out-channels=2 channel-mask=3 matrix=\"<<(double)0.6666666667,(double)0.0,(double)0.3333333333,(double)0.0>,<(double)0.0,(double)0.6666666667,(double)0.3333333333,(double)0.0>>\" ! audioamplify amplification=256 clipping-method=clip"
+		}
 		filter := ""
-		if c.WindFilter {
+		if c.NoiseMode() == "highpass" {
 			filter = "audiocheblimit mode=high-pass cutoff=180 poles=4 ripple=0.25 ! "
 		}
-		audio = fmt.Sprintf("pulsesrc name=mic device=%s provide-clock=false client-name=osmo-stream ! queue max-size-buffers=16 ! audioconvert ! audioresample ! audio/x-raw,format=F32LE,rate=48000,channels=2 ! %savenc_aac bitrate=128000 ! aacparse ! queue max-size-buffers=16 ! mux. ", c.AudioSource, filter)
+		audio = fmt.Sprintf("%s ! queue max-size-buffers=16 ! audioconvert ! audioresample ! audio/x-raw,format=F32LE,rate=48000,channels=2 ! %savenc_aac bitrate=128000 ! aacparse ! queue max-size-buffers=16 ! mux. ", capture, filter)
+		if c.NeuralAudio() {
+			blockBytes := 2048
+			if c.NoiseMode() == "rnnoise" {
+				blockBytes = 960
+			}
+			audio = fmt.Sprintf("%s ! queue max-size-buffers=16 ! audioconvert ! audioresample ! audio/x-raw,format=S16LE,rate=48000,channels=1 ! audiobuffersplit output-buffer-size=%d strict-buffer-size=true ! identity name=neuralwind ! audioconvert ! audio/x-raw,format=F32LE,rate=48000,channels=1 ! avenc_aac bitrate=128000 ! aacparse ! queue max-size-buffers=16 ! mux. ", capture, blockBytes)
+		}
+
 	}
-	return video + audio + "mpegtsmux name=mux alignment=7 ! appsink name=encoded sync=false max-buffers=8 drop=false wait-on-eos=false"
+	return video + audio + preview + "mpegtsmux name=mux alignment=7 ! appsink name=encoded sync=false max-buffers=8 drop=false wait-on-eos=false"
+}
+
+type ProcessorStats struct {
+	Mode               string  `json:"mode,omitempty"`
+	Frames             uint64  `json:"frames"`
+	BlockSamples       int     `json:"block_samples"`
+	CompensatedDelayMS int     `json:"compensated_delay_ms"`
+	AverageMS          float64 `json:"average_ms"`
+	MaxMS              float64 `json:"max_ms"`
 }
