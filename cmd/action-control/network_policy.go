@@ -17,8 +17,8 @@ const (
 	networkControlManaged = "managed"
 )
 
-var errNativeNetworkControl = errors.New("当前使用相机原生网络，请在相机上设置无线连接；独立网络控制仅在高级管理模式可用")
-var errManagedNetworkBusy = errors.New("Action Control 仍在管理网络，请先交还原生网络，待操作完成后再切换管理方式或升级")
+var errNativeNetworkControl = errors.New("Using native camera networking. Configure wireless connections on the camera; independent network controls are only available in advanced management mode")
+var errManagedNetworkBusy = errors.New("Action Control is still managing networking. Restore native networking and wait for completion before changing management mode or upgrading")
 
 func networkJSONError(w http.ResponseWriter, status int, code string, err error) {
 	switch {
@@ -146,7 +146,7 @@ func checkNetworkControlChange(a *App, previous, next Config) error {
 	if previous.NetworkControl == networkControlManaged && a.Root == "/" {
 		out, err := a.Run(a.Ctx, 5*time.Second, "systemctl", "is-active", "dji_network.service")
 		if err != nil || strings.TrimSpace(string(out)) != "active" {
-			return errors.New("请先交还原生网络并确认服务运行，再使用原生管理模式")
+			return errors.New("Restore native networking and confirm its services are running before using native management mode")
 		}
 	}
 	return nil

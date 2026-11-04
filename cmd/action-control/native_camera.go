@@ -53,7 +53,7 @@ func emptyNativeCameraStatus() NativeCameraStatus {
 		Source:        "systemd",
 		ServiceSource: "systemd",
 		ServiceState:  "unknown",
-		NativeState:   nativeObservationError("unavailable", "尚未读取原生拍摄状态。"),
+		NativeState:   nativeObservationError("unavailable", "Native capture status has not been read yet."),
 		Services:      []NativeCameraService{},
 		ObservedAt:    time.Now().UTC().Format(time.RFC3339),
 	}
@@ -131,8 +131,8 @@ func readNativeCameraServices(ctx context.Context, a *App) NativeCameraStatus {
 	status := emptyNativeCameraStatus()
 	if err := a.RequireDevice(); err != nil {
 		status.ServiceState = "unavailable"
-		status.Reason = "仅在相机上读取原生服务状态；本地模式不连接硬件。"
-		status.NativeState = nativeObservationError("unavailable", "本地模式不连接相机硬件。")
+		status.Reason = "Native service status is read only on the camera; local mode does not connect to hardware."
+		status.NativeState = nativeObservationError("unavailable", "Local mode does not connect to camera hardware.")
 		return status
 	}
 	args := []string{"show", "-p", "Id", "-p", "LoadState", "-p", "ActiveState", "-p", "SubState", "-p", "MainPID"}
@@ -140,7 +140,7 @@ func readNativeCameraServices(ctx context.Context, a *App) NativeCameraStatus {
 	status = parseNativeCameraStatus(string(output))
 	if err != nil {
 		status.ServiceState = "unknown"
-		status.Reason = "原生服务状态读取未完成：" + err.Error()
+		status.Reason = "Native service status read incomplete: " + err.Error()
 		return status
 	}
 	return status
@@ -174,7 +174,7 @@ func runNativeCameraStatus(w io.Writer) error {
 	return nativeObservationDiagnosticError(status.NativeState)
 }
 
-var errNativeCameraProtected = errors.New("独立采集会停止原生相机、屏幕和 Mimo 通信服务；请在高级独立采集中明确允许接管")
+var errNativeCameraProtected = errors.New("Independent capture stops native camera, display, and Mimo communication services. Explicitly allow takeover in advanced independent capture")
 
 type cameraTakeoverRequest struct {
 	Confirm        bool `json:"confirm"`
@@ -183,7 +183,7 @@ type cameraTakeoverRequest struct {
 
 func requireCameraTakeover(w http.ResponseWriter, request cameraTakeoverRequest) bool {
 	if !request.Confirm {
-		jsonError(w, http.StatusBadRequest, "confirmation_required", errors.New("启动会停止原生服务，必须明确确认"))
+		jsonError(w, http.StatusBadRequest, "confirmation_required", errors.New("Starting capture stops native services and requires explicit confirmation"))
 		return false
 	}
 	if !request.TakeoverNative {

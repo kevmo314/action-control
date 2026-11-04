@@ -180,7 +180,7 @@ func prepareWireless(a *App) error {
 	if err := requireManagedNetwork(a); err != nil {
 		return err
 	}
-	if err := a.MarkRebootRequired("无线运行态已更改", false); err != nil {
+	if err := a.MarkRebootRequired("Wireless runtime state changed", false); err != nil {
 		return err
 	}
 	if _, err := a.Run(a.Ctx, 20*time.Second, "systemctl", "stop", "dji_network.service"); err != nil {
@@ -644,7 +644,7 @@ func RegisterNetwork(mux *http.ServeMux, a *App) (func() error, error) {
 			return
 		}
 		if !input.Confirm {
-			jsonError(w, 400, "confirmation_required", errors.New("切换热点需要明确确认"))
+			jsonError(w, 400, "confirmation_required", errors.New("Hotspot changes require explicit confirmation"))
 			return
 		}
 		if err := queueNetwork(a, networkRequest{Action: "hotspot", Hotspot: &input.hotspotChange}); err != nil {

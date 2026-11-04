@@ -97,8 +97,8 @@ export function FilesPage() {
   return (
     <>
       <PageHeader
-        title="文件"
-        description="管理相机文件，上传进度可在右上角查看。"
+        title="Files"
+        description="Manage camera files. Track uploads in the top right corner."
         actions={
           <>
             <Button
@@ -107,7 +107,7 @@ export function FilesPage() {
               onClick={() => void refresh()}
             >
               <RefreshCw />
-              刷新
+              Refresh
             </Button>
             <Button
               variant="outline"
@@ -119,14 +119,14 @@ export function FilesPage() {
               }}
             >
               <FolderPlus />
-              新建目录
+              New directory
             </Button>
             <Button
               disabled={busy || !files.data}
               onClick={() => picker.current?.click()}
             >
               <Upload />
-              上传文件
+              Upload files
             </Button>
           </>
         }
@@ -136,18 +136,18 @@ export function FilesPage() {
         type="file"
         multiple
         className="sr-only"
-        aria-label="选择上传文件"
+        aria-label="Select files to upload"
         onChange={(event) => {
           const selected = Array.from(event.target.files ?? []);
           event.target.value = "";
           enqueueUploads(selected, dir);
         }}
       />
-      <div className="mb-5 flex flex-wrap gap-2" aria-label="存储位置">
+      <div className="mb-5 flex flex-wrap gap-2" aria-label="Storage location">
         {[
           ["/", "Blackbox"],
-          ["/sd", "SD 卡"],
-          ["/emulated", "内部存储"],
+          ["/sd", "SD card"],
+          ["/emulated", "Internal storage"],
         ].map(([path, title]) => (
           <Button
             key={path}
@@ -172,40 +172,42 @@ export function FilesPage() {
       <div className="mb-5 space-y-3">
         {error && <Notice tone="error">{error}</Notice>}
         {message && <Notice tone="success">{message}</Notice>}
-        {busy && <Notice>操作进行中…</Notice>}
+        {busy && <Notice>Operation in progress…</Notice>}
         {disk.data && (
           <div className="rounded-xl border bg-card px-4 py-3">
             <div className="mb-2 flex flex-wrap justify-between gap-2 text-sm">
               <span>
-                已用 {formatBytes(disk.data.used)} /{" "}
+                Used {formatBytes(disk.data.used)} /{" "}
                 {formatBytes(disk.data.total)}
               </span>
               <span className="text-muted-foreground">
-                可用 {formatBytes(disk.data.free)}
+                Available {formatBytes(disk.data.free)}
               </span>
             </div>
             <progress
               className="h-1.5 w-full accent-primary"
               max={100}
               value={disk.data.pct}
-              aria-label="存储使用率"
+              aria-label="Storage usage"
             />
           </div>
         )}
         {disk.error && (
-          <Notice tone="warning">容量读取失败：{disk.error.message}</Notice>
+          <Notice tone="warning">
+            Cannot read capacity: {disk.error.message}
+          </Notice>
         )}
       </div>
       <div className="flex flex-1 flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <nav
-            aria-label="目录路径"
+            aria-label="Directory path"
             className="flex min-w-0 flex-wrap items-center gap-1 text-sm"
           >
             <Button
               variant="ghost"
               size="icon"
-              aria-label="返回上级目录"
+              aria-label="Parent directory"
               disabled={
                 busy || !files.data || files.data.parent === files.data.path
               }
@@ -249,11 +251,11 @@ export function FilesPage() {
           </nav>
           <div className="w-full sm:w-64">
             <Label htmlFor="file-search" className="sr-only">
-              筛选当前目录
+              Filter current directory
             </Label>
             <Input
               id="file-search"
-              placeholder="筛选当前目录…"
+              placeholder="Filter current directory…"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -262,7 +264,7 @@ export function FilesPage() {
         {!!files.data?.warnings.length && (
           <div className="mb-4">
             <Notice tone="warning">
-              部分条目无法读取，列表不完整：
+              Some entries could not be read. The list is incomplete:
               <ul className="mt-1 break-all">
                 {files.data.warnings.map((warning) => (
                   <li key={warning}>{warning}</li>
@@ -274,22 +276,24 @@ export function FilesPage() {
         {files.isPending ? (
           <Spinner />
         ) : files.error ? (
-          <Notice tone="error">无法读取目录：{files.error.message}</Notice>
+          <Notice tone="error">
+            Cannot read directory: {files.error.message}
+          </Notice>
         ) : items.length === 0 ? (
           <EmptyState
             title={
               search
-                ? "没有匹配的文件"
+                ? "No matching files"
                 : files.data?.warnings.length
-                  ? "没有可显示的文件"
-                  : "目录为空"
+                  ? "No files to display"
+                  : "Directory is empty"
             }
             description={
               search
-                ? "试试其他文件名。"
+                ? "Try a different filename."
                 : files.data?.warnings.length
-                  ? "仍有条目读取失败，不能判定目录为空。"
-                  : "可以上传文件或新建目录。"
+                  ? "Some entries could not be read; the directory may not be empty."
+                  : "Upload files or create a directory."
             }
           />
         ) : (
@@ -297,12 +301,12 @@ export function FilesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>名称</TableHead>
-                  <TableHead className="hidden sm:table-cell">大小</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="hidden sm:table-cell">Size</TableHead>
                   <TableHead className="hidden lg:table-cell">
-                    修改时间
+                    Modified
                   </TableHead>
-                  <TableHead className="text-right">操作</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -334,14 +338,14 @@ export function FilesPage() {
                             </span>
                           )}
                           <span className="block text-xs text-muted-foreground sm:hidden">
-                            {item.is_dir ? "目录" : formatBytes(item.size)}
+                            {item.is_dir ? "Directory" : formatBytes(item.size)}
                           </span>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       {item.is_dir ? (
-                        <Badge>目录</Badge>
+                        <Badge>Directory</Badge>
                       ) : (
                         formatBytes(item.size)
                       )}
@@ -359,7 +363,7 @@ export function FilesPage() {
                                 dl: 1,
                               })}
                               download={item.name}
-                              aria-label={`下载 ${item.name}`}
+                              aria-label={`Download ${item.name}`}
                             >
                               <Download />
                             </a>
@@ -371,7 +375,7 @@ export function FilesPage() {
                               variant="ghost"
                               size="icon"
                               disabled={busy}
-                              aria-label={`${item.name} 的更多操作`}
+                              aria-label={`${item.name} more actions`}
                             >
                               <MoreHorizontal />
                             </Button>
@@ -385,7 +389,7 @@ export function FilesPage() {
                                     file: item.path,
                                   })}
                                 >
-                                  <Images /> 在相册中查看
+                                  <Images /> View in album
                                 </a>
                               </DropdownMenuItem>
                             )}
@@ -397,7 +401,7 @@ export function FilesPage() {
                               }}
                             >
                               <Pencil />
-                              重命名
+                              Rename
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               variant="destructive"
@@ -407,7 +411,7 @@ export function FilesPage() {
                               }}
                             >
                               <Trash2 />
-                              删除
+                              Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -429,16 +433,17 @@ export function FilesPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              删除{removeItem?.is_dir ? "目录" : "文件"}？
+              Delete {removeItem?.is_dir ? "directory" : "file"}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              将永久删除「{removeItem?.name}」
-              {removeItem?.is_dir ? "及其全部内容" : ""}，不可撤销。
+              Permanently delete “{removeItem?.name}”
+              {removeItem?.is_dir ? " and all its contents" : ""}. This cannot
+              be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteError && <Notice tone="error">{deleteError}</Notice>}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>取消</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               disabled={busy}
@@ -455,7 +460,7 @@ export function FilesPage() {
                   );
                   setRemoveItem(null);
                   if (result.warning) {
-                    setMessage(`文件已删除。${result.warning}`);
+                    setMessage(`File deleted. ${result.warning}`);
                   }
                   await refresh();
                 } catch (error) {
@@ -465,7 +470,7 @@ export function FilesPage() {
                 }
               }}
             >
-              {busy ? "删除中…" : "确认删除"}
+              {busy ? "Deleting…" : "Confirm deletion"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -475,8 +480,8 @@ export function FilesPage() {
         onOpenChange={(open) => {
           if (!open && !busy) setDialog(null);
         }}
-        title={dialog?.kind === "rename" ? "重命名" : "新建目录"}
-        description="名称不能包含路径分隔符。同名目标不会被覆盖。"
+        title={dialog?.kind === "rename" ? "Rename" : "New directory"}
+        description="Names cannot contain path separators. Existing destinations are never overwritten."
       >
         <form
           className="space-y-4"
@@ -500,7 +505,7 @@ export function FilesPage() {
           }}
         >
           <div>
-            <Label htmlFor="file-name">名称</Label>
+            <Label htmlFor="file-name">Name</Label>
             <Input
               autoFocus
               id="file-name"
@@ -514,7 +519,7 @@ export function FilesPage() {
           {formError && <Notice tone="error">{formError}</Notice>}
           <div className="flex justify-end">
             <Button type="submit" disabled={busy || !name}>
-              {busy ? "保存中…" : "保存"}
+              {busy ? "Saving…" : "Save"}
             </Button>
           </div>
         </form>

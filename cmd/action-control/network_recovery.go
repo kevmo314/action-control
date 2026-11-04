@@ -70,7 +70,7 @@ func recoveryForStatus(status wifiStatus, known []knownNetwork, hotspotData []by
 func captureNetworkRecovery(a *App, change *hotspotChange) (*networkRecoveryPlan, error) {
 	status, err := getWiFiStatus(a, a.Ctx)
 	if err != nil {
-		return nil, fmt.Errorf("无法确认切换前的网络状态：%w", err)
+		return nil, fmt.Errorf("Cannot confirm network state before switching: %w", err)
 	}
 	var known []knownNetwork
 	if status.Mode == "client" {
@@ -131,7 +131,7 @@ func restoreNetwork(a *App, plan *networkRecoveryPlan) error {
 	case "hotspot":
 		return startHotspot(a)
 	default:
-		return errors.New("没有可恢复的先前连接，请通过 USB ADB 访问")
+		return errors.New("No previous connection to restore. Use USB ADB to access the device")
 	}
 }
 
@@ -166,7 +166,7 @@ func finishNetworkOperation(op networkOperation, cause error, cleanup func() err
 	if err != nil {
 		op.RecoveryStatus = "failed"
 		cleanupErr := cleanup()
-		op.Error = errors.Join(cause, fmt.Errorf("恢复先前网络失败：%w", err), cleanupErr).Error()
+		op.Error = errors.Join(cause, fmt.Errorf("Failed to restore previous network: %w", err), cleanupErr).Error()
 		return errors.Join(cause, err, cleanupErr, persist(op))
 	}
 	op.RecoveryStatus = "restored"

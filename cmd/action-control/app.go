@@ -103,7 +103,7 @@ func (a *App) Path(absolute string) string {
 }
 func (a *App) RequireDevice() error {
 	if runtime.GOOS != "linux" || a.Root != "/" || os.Geteuid() != 0 {
-		return errors.New("此操作仅限相机上的 root 服务；本地文件预览不控制硬件")
+		return errors.New("This operation requires the root service on the camera; local filesystem preview does not control hardware")
 	}
 	b, err := os.ReadFile("/build.prop")
 	if err != nil {

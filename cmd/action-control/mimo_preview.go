@@ -64,7 +64,7 @@ func (p *mimoPreviewController) openDevice(ctx context.Context) (io.ReadCloser, 
 		return nil, nil, err
 	}
 	if p.camera.status().State != "stopped" || a.RebootRequired() {
-		return nil, nil, errors.New("请先恢复原生相机服务，再连接 Mimo 预览")
+		return nil, nil, errors.New("Restore native camera services before connecting to Mimo preview")
 	}
 	services := readNativeCameraServices(ctx, a)
 	for _, unit := range []string{"dji_camera3.service", "dji_sw_uav.service"} {
@@ -73,7 +73,7 @@ func (p *mimoPreviewController) openDevice(ctx context.Context) (io.ReadCloser, 
 			found = found || (service.Unit == unit && service.State == "running")
 		}
 		if !found {
-			return nil, nil, errors.New("原生相机或 Mimo 通信服务未运行")
+			return nil, nil, errors.New("Native camera or Mimo communication services are not running")
 		}
 	}
 	iface, err := net.InterfaceByName("wlan0")
@@ -89,13 +89,13 @@ func (p *mimoPreviewController) openDevice(ctx context.Context) (io.ReadCloser, 
 		ip, _, e := net.ParseCIDR(address.String())
 		if e == nil && ip.To4() != nil && !ip.IsUnspecified() {
 			if source != "" {
-				return nil, nil, errors.New("wlan0 有多个 IPv4 地址，无法确定原生视频来源")
+				return nil, nil, errors.New("wlan0 has multiple IPv4 addresses; cannot identify the native video source")
 			}
 			source = ip.String()
 		}
 	}
 	if source == "" || iface.Flags&net.FlagUp == 0 {
-		return nil, nil, errors.New("请先使用 Mimo 连接相机并打开实时预览")
+		return nil, nil, errors.New("Connect to the camera in Mimo and open live preview first")
 	}
 	program, err := a.Tool("tcpdump")
 	if err != nil {
@@ -153,7 +153,7 @@ func (p *mimoPreviewController) subscribe(ctx context.Context) (*mimoPreviewRun,
 		// Share the existing operation lock only during startup. A live mirror
 		// must not block native recording or claim camera ownership.
 		if !p.camera.operation.TryLock() {
-			return nil, nil, errors.New("相机操作正在进行，请稍后连接预览")
+			return nil, nil, errors.New("A camera operation is in progress. Connect preview shortly")
 		}
 		defer p.camera.operation.Unlock()
 		runCtx, cancel := context.WithCancel(p.camera.app.Ctx)
@@ -173,10 +173,10 @@ func (p *mimoPreviewController) subscribe(ctx context.Context) (*mimoPreviewRun,
 	}
 	run := p.run
 	if run.stopping {
-		return nil, nil, errors.New("视频转发正在退出，请稍后重新连接")
+		return nil, nil, errors.New("Video relay is shutting down. Reconnect shortly")
 	}
 	if len(run.clients) >= mimoPreviewClients {
-		return nil, nil, errors.New("最多同时打开 4 个网页预览")
+		return nil, nil, errors.New("At most 4 web previews can be open at once")
 	}
 	client := &mimoPreviewClient{chunks: make(chan []byte, 16), closed: make(chan struct{})}
 	run.clients[client] = struct{}{}
@@ -242,7 +242,7 @@ func (p *mimoPreviewController) watchdog(ctx context.Context, run *mimoPreviewRu
 				last, timeout = run.started, p.waitTimeout
 			}
 			if !run.stopping && time.Since(last) > timeout {
-				run.status.Error = "未收到可播放的 Mimo 视频。请让 Mimo 停留在实时预览页，然后重新连接。"
+				run.status.Error = "No playable Mimo video received. Keep Mimo on its live preview page, then reconnect."
 				run.stopping = true
 				run.cancel()
 			}
@@ -275,9 +275,9 @@ func (p *mimoPreviewController) pump(ctx context.Context, run *mimoPreviewRun, s
 	defer p.mu.Unlock()
 	if !cancelled && run.status.Error == "" {
 		if err = errors.Join(err, waitErr); err == nil {
-			err = errors.New("视频观察进程已退出")
+			err = errors.New("Video observer exited")
 		}
-		run.status.Error = "视频转发已停止：" + err.Error()
+		run.status.Error = "Video relay stopped: " + err.Error()
 	}
 	for client := range run.clients {
 		p.dropLocked(run, client)
@@ -305,7 +305,7 @@ func (p *mimoPreviewController) stop() error {
 		select {
 		case <-run.done:
 		case <-time.After(4 * time.Second):
-			return errors.New("视频观察进程尚未退出")
+			return errors.New("Video observer has not exited yet")
 		}
 	}
 	return nil
@@ -335,7 +335,7 @@ func (p *mimoPreviewController) stream(w http.ResponseWriter, r *http.Request) {
 	started := false
 	unavailable := func() {
 		if !started {
-			jsonError(w, 503, "mimo_preview_unavailable", errors.New("Mimo 预览未就绪，请保持手机实时预览后重新连接"))
+			jsonError(w, 503, "mimo_preview_unavailable", errors.New("Mimo preview is not ready. Keep live preview open on your phone, then reconnect"))
 		}
 	}
 	for {
@@ -353,7 +353,7 @@ func (p *mimoPreviewController) stream(w http.ResponseWriter, r *http.Request) {
 			return
 		case <-deadline.C:
 			if !started {
-				jsonError(w, 503, "mimo_preview_unavailable", errors.New("等待 Mimo 关键帧超时，请保持手机实时预览后重新连接"))
+				jsonError(w, 503, "mimo_preview_unavailable", errors.New("Timed out waiting for a Mimo keyframe. Keep live preview open on your phone, then reconnect"))
 				return
 			}
 		case chunk, ok := <-client.chunks:

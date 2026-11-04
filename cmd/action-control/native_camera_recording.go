@@ -234,10 +234,10 @@ func runNativeRecording(ctx context.Context, a *App, action string) NativeRecord
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
 	if !validNativeAction(action) {
-		return nativeRecordingNotSent("不支持的原生相机操作。")
+		return nativeRecordingNotSent("Unsupported native camera operation.")
 	}
 	if err := a.nativeIO.acquire(ctx); err != nil {
-		return nativeRecordingNotSent("等待原生相机访问已超时或取消。")
+		return nativeRecordingNotSent("Waiting for native camera access timed out or was cancelled.")
 	}
 	defer a.nativeIO.release()
 	a.nativeReader.invalidate()
@@ -246,11 +246,11 @@ func runNativeRecording(ctx context.Context, a *App, action string) NativeRecord
 	if err != nil || ctx.Err() != nil {
 		// The child may have sent a command before timing out or failing. Neither
 		// missing output nor process termination proves that the camera stopped.
-		return NativeRecordingResult{Outcome: "unknown", Reason: "原生调用未完整返回；请先查看相机状态，勿自动重发。"}
+		return NativeRecordingResult{Outcome: "unknown", Reason: "Incomplete native response. Check camera status before retrying; do not resend automatically."}
 	}
 	result, err := decodeNativeRecording(output, action)
 	if err != nil {
-		return NativeRecordingResult{Outcome: "unknown", Reason: "原生调用结果无效：" + err.Error()}
+		return NativeRecordingResult{Outcome: "unknown", Reason: "Invalid native response: " + err.Error()}
 	}
 	return result
 }
@@ -262,7 +262,7 @@ func (c *cameraController) executeNativeRecording(action string) NativeRecording
 	independent := c.run != nil
 	c.mu.Unlock()
 	if independent || c.app.ScreenRequired() {
-		return nativeRecordingNotSent("独立采集已接管原生相机，请先恢复原生服务。")
+		return nativeRecordingNotSent("Independent capture has taken over the native camera. Restore native services first.")
 	}
 	status := readNativeCameraServices(ctx, c.app)
 	available := false
@@ -272,7 +272,7 @@ func (c *cameraController) executeNativeRecording(action string) NativeRecording
 		}
 	}
 	if !available || status.Reason != "" {
-		return nativeRecordingNotSent("未确认原生相机服务正常运行。")
+		return nativeRecordingNotSent("Native camera services have not been confirmed running.")
 	}
 	return runNativeRecording(ctx, c.app, action)
 }
@@ -281,61 +281,61 @@ func nativeRecordingMessage(result NativeRecordingResult) string {
 	if result.Action == "capture" {
 		switch result.Outcome {
 		case "accepted":
-			return "相机已受理拍照请求，请在相册确认新照片。"
+			return "Camera accepted the photo request. Check the album for the new photo."
 		case "blocked":
-			return "相机当前状态不支持拍照，请先停止录像并稍后刷新状态。"
+			return "The current camera state does not allow photos. Stop recording and refresh status shortly."
 		case "rejected":
-			return fmt.Sprintf("相机返回错误（代码 %d），请查看相机提示和当前状态。", *result.NativeCode)
+			return fmt.Sprintf("Camera returned an error (code %d). Check the camera display and current status.", *result.NativeCode)
 		case "not_sent":
-			return "拍照请求未发送，请检查原生相机状态。"
+			return "Photo request was not sent. Check native camera status."
 		default:
-			return "拍照请求结果未知，请先查看原生状态，确认后再操作。"
+			return "Photo request outcome unknown. Check native status before trying again."
 		}
 	}
 	if validNativeModeAction(result.Action) {
-		mode := "拍照"
+		mode := "photo"
 		if result.Action == "mode_video" {
-			mode = "视频"
+			mode = "video"
 		}
 		switch result.Outcome {
 		case "confirmed":
-			return "已切换到" + mode + "模式。"
+			return "Switched to " + mode + " mode."
 		case "already":
-			return "相机已处于" + mode + "模式，未重复切换。"
+			return "Camera is already in " + mode + " mode; no duplicate switch sent."
 		case "accepted":
-			return "已受理切换到" + mode + "模式，暂未确认。"
+			return "Switch accepted to " + mode + " mode; not yet confirmed."
 		case "blocked":
-			return "相机当前状态不支持切换模式，请先停止录像并稍后刷新。"
+			return "The current camera state does not allow mode switching. Stop recording and refresh status shortly."
 		case "rejected":
-			return fmt.Sprintf("相机返回错误（代码 %d），请查看相机提示和当前状态。", *result.NativeCode)
+			return fmt.Sprintf("Camera returned an error (code %d). Check the camera display and current status.", *result.NativeCode)
 		case "not_sent":
-			return "切换模式请求未发送，请检查原生相机状态。"
+			return "Mode switch request was not sent. Check native camera status."
 		default:
-			return "切换模式结果未知，请先查看原生状态，确认后再操作。"
+			return "Mode switch outcome unknown. Check native status before trying again."
 		}
 	}
-	verb := "开始"
+	verb := "start"
 	if result.Action == "stop_recording" {
-		verb = "停止"
+		verb = "stop"
 	}
 	switch result.Outcome {
 	case "confirmed":
-		return "已观察到相机" + verb + "录像。"
+		return "Observed camera " + verb + " recording."
 	case "already":
 		if result.Action == "stop_recording" {
-			return "相机当前未录像，未重复发送停止指令。"
+			return "Camera is not recording; no duplicate stop command sent."
 		}
-		return "相机当前已在录像，未重复发送开始指令。"
+		return "Camera is already recording; no duplicate start command sent."
 	case "accepted":
-		return "相机已受理" + verb + "录像请求，暂未确认状态变化。"
+		return "Camera accepted " + verb + " recording request; state change not yet confirmed."
 	case "blocked":
-		return "相机当前状态不支持此操作，请稍后刷新状态。"
+		return "The current camera state does not allow this operation. Refresh status shortly."
 	case "rejected":
-		return fmt.Sprintf("相机返回错误（代码 %d），请查看相机提示和当前状态。", *result.NativeCode)
+		return fmt.Sprintf("Camera returned an error (code %d). Check the camera display and current status.", *result.NativeCode)
 	case "not_sent":
-		return "录像请求未发送，请检查原生相机状态。"
+		return "Recording request was not sent. Check native camera status."
 	default:
-		return "录像请求结果未知，请先查看原生状态，确认后再操作。"
+		return "Recording request outcome unknown. Check native status before trying again."
 	}
 }
 
@@ -354,9 +354,9 @@ type nativeRecordingController struct {
 
 var (
 	nativeRequestIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{8,80}$`)
-	errNativeRequestReuse  = errors.New("同一 request_id 不能用于不同录像操作")
-	errNativeActionBusy    = errors.New("已有相机操作正在执行，请稍后刷新状态")
-	errNativeRequestLimit  = errors.New("录像请求过于频繁，请稍后重试")
+	errNativeRequestReuse  = errors.New("The same request_id cannot be reused for different recording operations")
+	errNativeActionBusy    = errors.New("A camera operation is already in progress. Refresh status shortly")
+	errNativeRequestLimit  = errors.New("Recording requests are too frequent; try again shortly")
 )
 
 // Store request results, never a desired recording state. A disconnected HTTP
@@ -414,15 +414,15 @@ func waitNativeRecording(ctx context.Context, attempt *nativeRecordingAttempt, r
 }
 
 func (controller *nativeRecordingController) handleRecording(w http.ResponseWriter, r *http.Request) {
-	controller.serve(w, r, validNativeRecordingAction, "需要明确的录像操作与 8–80 位 request_id")
+	controller.serve(w, r, validNativeRecordingAction, "Requires an explicit recording action and a request_id of 8–80 characters")
 }
 
 func (controller *nativeRecordingController) handleCapture(w http.ResponseWriter, r *http.Request) {
-	controller.serve(w, r, func(a string) bool { return a == "capture" }, "需要 action=capture 与 8–80 位 request_id")
+	controller.serve(w, r, func(a string) bool { return a == "capture" }, "Requires action=capture and a request_id of 8–80 characters")
 }
 
 func (controller *nativeRecordingController) handleMode(w http.ResponseWriter, r *http.Request) {
-	controller.serve(w, r, validNativeModeAction, "需要 action=mode_photo|mode_video 与 8–80 位 request_id")
+	controller.serve(w, r, validNativeModeAction, "Requires action=mode_photo|mode_video and a request_id of 8–80 characters")
 }
 
 func (controller *nativeRecordingController) serve(w http.ResponseWriter, r *http.Request, allowed func(string) bool, invalidMsg string) {

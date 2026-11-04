@@ -102,14 +102,14 @@ func (h *nativeHotspotController) run(ctx context.Context, action string) Native
 	// inside the injected call, so allow headroom before the outer deadline.
 	output, err := h.app.Run(ctx, 12*time.Second, "python3", "-I", "-B", "-c", nativeHotspotScript, action)
 	if ctx.Err() != nil {
-		return nativeHotspotError(action, "error", "原生热点操作超时或已取消。")
+		return nativeHotspotError(action, "error", "Native hotspot operation timed out or was cancelled.")
 	}
 	if err != nil {
-		return nativeHotspotError(action, "error", "原生热点操作未完成："+err.Error())
+		return nativeHotspotError(action, "error", "Native hotspot operation incomplete: "+err.Error())
 	}
 	result, e := decodeNativeHotspot(output, action)
 	if e != nil {
-		return nativeHotspotError(action, "error", "原生热点结果无效。")
+		return nativeHotspotError(action, "error", "Invalid native hotspot result.")
 	}
 	return result
 }
@@ -137,11 +137,11 @@ func (h *nativeHotspotController) handle(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if !validNativeHotspotAction(req.Action) {
-		jsonError(w, 400, "invalid_action", errors.New("需要 action=start|stop"))
+		jsonError(w, 400, "invalid_action", errors.New("Requires action=start|stop"))
 		return
 	}
 	if !h.mu.TryLock() {
-		jsonError(w, 409, "hotspot_busy", errors.New("原生热点操作正在进行"))
+		jsonError(w, 409, "hotspot_busy", errors.New("A native hotspot operation is in progress"))
 		return
 	}
 	defer h.mu.Unlock()

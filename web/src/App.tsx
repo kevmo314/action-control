@@ -50,13 +50,18 @@ const ProcessPage = lazy(() =>
 );
 
 const navigation = [
-  { id: "overview", name: "概览", icon: LayoutDashboard, page: OverviewPage },
-  { id: "camera", name: "相机", icon: Camera, page: CameraPage },
-  { id: "album", name: "相册", icon: Images, page: AlbumPage },
-  { id: "files", name: "文件", icon: Folder, page: FilesPage },
-  { id: "network", name: "网络", icon: Wifi, page: NetworkPage },
-  { id: "processes", name: "进程", icon: ListTree, page: ProcessPage },
-  { id: "system", name: "系统", icon: Settings2, page: SystemPage },
+  {
+    id: "overview",
+    name: "Overview",
+    icon: LayoutDashboard,
+    page: OverviewPage,
+  },
+  { id: "camera", name: "Camera", icon: Camera, page: CameraPage },
+  { id: "album", name: "Album", icon: Images, page: AlbumPage },
+  { id: "files", name: "Files", icon: Folder, page: FilesPage },
+  { id: "network", name: "Network", icon: Wifi, page: NetworkPage },
+  { id: "processes", name: "Processes", icon: ListTree, page: ProcessPage },
+  { id: "system", name: "System", icon: Settings2, page: SystemPage },
 ];
 class PageBoundary extends Component<
   { children: ReactNode },
@@ -69,13 +74,13 @@ class PageBoundary extends Component<
   render() {
     return this.state.error ? (
       <Notice tone="error">
-        页面出错：{this.state.error}
+        Page error: {this.state.error}
         <Button
           className="ml-3"
           variant="outline"
           onClick={() => location.reload()}
         >
-          重新载入
+          Reload
         </Button>
       </Notice>
     ) : (
@@ -156,7 +161,7 @@ export function App() {
     <div className="min-h-dvh">
       {mobile && (
         <button
-          aria-label="关闭导航"
+          aria-label="Close navigation"
           className="fixed inset-0 z-30 bg-black/40 md:hidden"
           onClick={() => setMobile(false)}
         />
@@ -172,7 +177,7 @@ export function App() {
         <div className="p-2">
           <a
             href="#/overview"
-            aria-label="Action Control 设备概览"
+            aria-label="Action Control device overview"
             className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-sidebar-accent"
           >
             <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -195,9 +200,9 @@ export function App() {
               collapsed && "md:sr-only",
             )}
           >
-            控制台
+            Console
           </p>
-          <nav aria-label="主导航" className="space-y-1">
+          <nav aria-label="Main navigation" className="space-y-1">
             {navigation.map((item) => (
               <a
                 key={item.id}
@@ -239,12 +244,12 @@ export function App() {
             <div className={cn("min-w-0 flex-1", collapsed && "md:hidden")}>
               <p className="truncate text-sm font-medium">
                 {health.isPending
-                  ? "正在连接"
+                  ? "Connecting"
                   : health.isError
-                    ? "连接中断"
+                    ? "Connection lost"
                     : health.data?.device
-                      ? "设备在线"
-                      : "本地文件模式"}
+                      ? "Device online"
+                      : "Local filesystem mode"}
               </p>
               <p className="truncate text-xs text-muted-foreground">
                 v{health.data?.version ?? "—"} · {location.host}
@@ -267,7 +272,7 @@ export function App() {
               className="size-11 md:hidden"
               aria-expanded={mobile}
               aria-controls="app-navigation"
-              aria-label={mobile ? "关闭导航" : "打开导航"}
+              aria-label={mobile ? "Close navigation" : "Open navigation"}
               onClick={() => setMobile(!mobile)}
             >
               {mobile ? <X /> : <Menu />}
@@ -276,7 +281,7 @@ export function App() {
               variant="ghost"
               size="icon"
               className="hidden size-9 md:flex"
-              aria-label={collapsed ? "展开侧栏" : "收起侧栏"}
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               aria-expanded={!collapsed}
               aria-controls="app-navigation"
               onClick={() => setCollapsed(!collapsed)}
@@ -299,14 +304,17 @@ export function App() {
           {health.isError ? (
             <div className="mb-6">
               <Notice tone="warning">
-                连接暂时中断。设备可能仍在采集；请勿根据断连重复执行控制操作。
+                Connection temporarily lost. Capture may still be running; do
+                not repeat control operations just because the connection
+                dropped.
               </Notice>
             </div>
           ) : health.data?.device === false ? (
             <div className="mb-6">
               <Notice>
-                本地文件模式 ·
-                文件与网页功能可用，相机、无线和系统控制未连接真实设备。
+                Local filesystem mode · Files and the web interface are
+                available. Camera, wireless, and system controls are disabled in
+                this mode.
               </Notice>
             </div>
           ) : null}
@@ -321,23 +329,23 @@ export function App() {
                   }
                 >
                   {camera.isPending
-                    ? "读取独立采集状态…"
+                    ? "Reading independent capture status…"
                     : camera.isError
-                      ? "独立采集状态未知"
+                      ? "Independent capture status unknown"
                       : camera.data?.running
-                        ? "独立采集中"
+                        ? "Independent capture running"
                         : camera.data?.state === "starting"
-                          ? "正在启动独立采集"
+                          ? "Starting independent capture"
                           : camera.data?.state === "stopping"
-                            ? "正在停止独立采集"
+                            ? "Stopping independent capture"
                             : camera.data?.state === "error"
-                              ? "独立采集异常"
-                              : "独立采集未启动"}
+                              ? "Independent capture error"
+                              : "Independent capture stopped"}
                 </Badge>
                 {camera.data?.running && !camera.isError && (
                   <span className="tabular-nums text-muted-foreground">
-                    已运行 {Math.floor(camera.data.uptime_sec / 60)} 分{" "}
-                    {Math.floor(camera.data.uptime_sec % 60)} 秒
+                    Uptime {Math.floor(camera.data.uptime_sec / 60)} min{" "}
+                    {Math.floor(camera.data.uptime_sec % 60)} sec
                   </span>
                 )}
                 {camera.data?.reboot_required && (
@@ -345,7 +353,7 @@ export function App() {
                     className="text-amber-700 underline underline-offset-4 dark:text-amber-300"
                     href="#/system?section=maintenance"
                   >
-                    恢复原生拍摄需要整机重启
+                    A full reboot is required to restore native capture
                   </a>
                 )}
               </div>
@@ -353,7 +361,7 @@ export function App() {
                 href="#/camera"
                 className="font-medium underline underline-offset-4"
               >
-                查看相机
+                View camera
               </a>
             </div>
           )}

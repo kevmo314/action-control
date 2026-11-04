@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-var errMediaIndexLocked = errors.New("AC004.db 被相机原生服务占用")
+var errMediaIndexLocked = errors.New("AC004.db is in use by native camera services")
 
 type mediaIndexLocation struct {
 	Storage  string
@@ -150,12 +150,12 @@ func (s *fileStore) scanMediaIndex(ctx context.Context, storage string) (MediaIn
 		return status, nil, err
 	}
 	if info == nil {
-		status.Reason = "未找到 AC004.db"
+		status.Reason = "AC004.db not found"
 		return status, nil, nil
 	}
 	status.DatabaseBytes = info.Size()
 	if !ready {
-		status.Reason = "设备缺少 sqlite3"
+		status.Reason = "sqlite3 is missing on the device"
 		return status, nil, nil
 	}
 	out, err := s.runSQLite(ctx, location, false, "PRAGMA query_only=ON; SELECT COUNT(*) FROM pragma_table_info('gis_info_table') WHERE name IN ('ID','file_name');\n")
@@ -163,7 +163,7 @@ func (s *fileStore) scanMediaIndex(ctx context.Context, storage string) (MediaIn
 		return status, nil, err
 	}
 	if strings.TrimSpace(string(out)) != "2" {
-		return status, nil, errors.New("AC004.db 缺少 gis_info_table.ID/file_name")
+		return status, nil, errors.New("AC004.db is missing gis_info_table.ID/file_name")
 	}
 	out, err = s.runSQLite(ctx, location, false, "PRAGMA query_only=ON; PRAGMA quick_check;\n")
 	if err != nil {
@@ -245,7 +245,7 @@ func (s *fileStore) removeMediaIndexPath(ctx context.Context, virtual string, di
 		return err
 	}
 	if !ready {
-		return errors.New("文件已删除，但设备缺少 sqlite3，AC004.db 未同步")
+		return errors.New("File deleted, but AC004.db was not synced because sqlite3 is missing")
 	}
 	// dji_media_server may briefly hold the write lock. Retry with backoff; the
 	// file is already gone, so a persistent lock is not a delete failure — the
@@ -259,14 +259,14 @@ func (s *fileStore) removeMediaIndexPath(ctx context.Context, virtual string, di
 			return nil
 		}
 		if !errors.Is(err, errMediaIndexLocked) {
-			return fmt.Errorf("文件已删除，但 AC004.db 未同步: %w", err)
+			return fmt.Errorf("File deleted, but AC004.db was not synced: %w", err)
 		}
 		if attempt >= 2 || ctx.Err() != nil {
-			return fmt.Errorf("%w: 文件已删除，AC004.db 稍后可在“清理失效索引”同步", errMediaIndexLocked)
+			return fmt.Errorf("%w: file deleted; sync AC004.db later using Clean stale index", errMediaIndexLocked)
 		}
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("%w: 文件已删除，AC004.db 稍后可在“清理失效索引”同步", errMediaIndexLocked)
+			return fmt.Errorf("%w: file deleted; sync AC004.db later using Clean stale index", errMediaIndexLocked)
 		case <-time.After(time.Duration(attempt+1) * 500 * time.Millisecond):
 		}
 	}
@@ -341,7 +341,7 @@ func (s *fileStore) cleanMediaIndex(ctx context.Context, storage string) (MediaI
 
 func mediaIndexErrorCode(err error) (int, string, error) {
 	if errors.Is(err, errMediaIndexLocked) {
-		return 409, "media_index_locked", errors.New("数据库被相机原生服务占用；请先在系统页停止原生相机服务，再执行清理；完成后需要重启相机恢复原生功能")
+		return 409, "media_index_locked", errors.New("The database is in use by native camera services. Stop native camera services on the System page before cleanup, then reboot the camera to restore native functionality")
 	}
 	return 500, "media_index_cleanup", err
 }

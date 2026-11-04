@@ -34,7 +34,7 @@ export async function responseValue<T>(response: Response): Promise<T> {
       const data = await response.json();
       message = data.error?.message ?? data.message ?? message;
       code = data.error?.code;
-      if (data.files?.length) message += `；已保存：${data.files.join("、")}`;
+      if (data.files?.length) message += `; saved: ${data.files.join(", ")}`;
     } catch {
       /* HTTP errors may have no JSON body. */
     }
@@ -84,7 +84,7 @@ export function uploadFile(
 ): Promise<{ files: string[] }> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) {
-      reject(new DOMException("上传已取消", "AbortError"));
+      reject(new DOMException("Upload cancelled", "AbortError"));
       return;
     }
     const xhr = new XMLHttpRequest();
@@ -105,7 +105,7 @@ export function uploadFile(
       cleanup();
       reject(
         new Error(
-          "连接中断或超时，文件可能已保存；请先检查目标目录，再决定是否重试。",
+          "Connection interrupted or timed out. The file may have been saved; check the destination before retrying.",
         ),
       );
     };
@@ -113,7 +113,7 @@ export function uploadFile(
       cleanup();
       reject(
         new DOMException(
-          "上传请求已取消；已保存的文件会保留，请检查目标目录。",
+          "Upload cancelled. Saved files are kept; check the destination directory.",
           "AbortError",
         ),
       );

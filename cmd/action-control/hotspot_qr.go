@@ -74,7 +74,7 @@ func hotspotQRHandler(a *App) http.HandlerFunc {
 			}
 			content = wifiQRContent(h)
 		default:
-			jsonError(w, 400, "invalid_kind", errors.New("需要 kind=wifi|url"))
+			jsonError(w, 400, "invalid_kind", errors.New("Requires kind=wifi|url"))
 			return
 		}
 		size, matrix, err := qrMatrix(content)

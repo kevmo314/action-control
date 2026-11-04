@@ -95,7 +95,7 @@ export function ConfirmButton({
         </AlertDialogHeader>
         {error && <Notice tone="error">{error}</Notice>}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>取消</AlertDialogCancel>
+          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             disabled={busy}
@@ -113,7 +113,7 @@ export function ConfirmButton({
               }
             }}
           >
-            {busy ? "执行中" : "确认执行"}
+            {busy ? "Running" : "Confirm"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -53,14 +53,15 @@ function MediaIndexCard({
     <div className="rounded-lg border p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="font-medium">{label}媒体索引</p>
+          <p className="font-medium">{label} media index</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            检测 AC004.db 中已经不存在的文件记录；清理前自动创建数据库备份。
+            Find AC004.db records for missing files. A database backup is
+            created automatically before cleanup.
           </p>
         </div>
         <ConfirmButton
-          title={`清理${label}失效媒体索引？`}
-          description={`将删除 ${index.data?.stale ?? 0} 条文件已不存在的记录。操作前会在${label} MISC 目录创建 AC004.db 备份；不会执行 VACUUM。`}
+          title={`Clean stale media index entries on ${label}?`}
+          description={`Delete ${index.data?.stale ?? 0} records for files that no longer exist. A database backup will be created in ${label} MISC directory before cleanup; VACUUM is not run.`}
           variant="destructive"
           disabled={
             !hardware || busy || !index.data?.available || !index.data.stale
@@ -69,12 +70,12 @@ function MediaIndexCard({
             perform(
               "clean_media_index",
               { storage, confirm: true },
-              `${label}失效媒体索引已清理，数据库备份保留在 MISC 目录。`,
+              `${label}: stale media index entries removed. A database backup is kept in the MISC directory.`,
             )
           }
         >
           <Database />
-          清理媒体索引
+          Clean media index
         </ConfirmButton>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -83,19 +84,19 @@ function MediaIndexCard({
         ) : index.isError ? (
           <Notice tone="warning">{index.error.message}</Notice>
         ) : !index.data?.available ? (
-          <Badge>{index.data?.reason ?? "媒体索引不可用"}</Badge>
+          <Badge>{index.data?.reason ?? "Media index unavailable"}</Badge>
         ) : (
           <>
-            <Badge>总记录：{index.data.total}</Badge>
-            <Badge>失效：{index.data.stale}</Badge>
+            <Badge>Total records: {index.data.total}</Badge>
+            <Badge>Stale: {index.data.stale}</Badge>
             {index.data.invalid > 0 && (
-              <Badge>异常路径：{index.data.invalid}</Badge>
+              <Badge>Problem path: {index.data.invalid}</Badge>
             )}
             {Object.entries(index.data.by_type)
               .filter(([, count]) => count > 0)
               .map(([type, count]) => (
                 <Badge key={type}>
-                  {type}：{count}
+                  {type}: {count}
                 </Badge>
               ))}
           </>
@@ -164,8 +165,8 @@ export function SystemPage() {
   return (
     <>
       <PageHeader
-        title="系统"
-        description="原生服务与维护工具。这里的操作具有 root 权限。"
+        title="System"
+        description="Native services and maintenance tools. These operations run as root."
       />
       {error && (
         <div className="mb-4">
@@ -179,8 +180,8 @@ export function SystemPage() {
       )}
       <div className="space-y-6">
         <Card
-          title="性能设置"
-          description="调整相册缩略图的生成速度与资源占用。"
+          title="Performance settings"
+          description="Adjust album thumbnail generation speed and resource usage."
         >
           {config.isError ? (
             <Notice tone="error">{config.error.message}</Notice>
@@ -195,13 +196,13 @@ export function SystemPage() {
                   void perform(
                     "config",
                     { thumb_concurrent: concurrency },
-                    "设置已保存；缩略图并发变更在下次面板启动后生效。",
+                    "Settings saved. Thumbnail concurrency changes take effect after the next console restart.",
                   ).catch(() => {});
               }}
             >
               <div className="min-w-0 flex-1 basis-64">
                 <Label htmlFor="thumbnail-concurrency">
-                  缩略图并发（重启面板后生效）
+                  Concurrent thumbnails (requires console restart)
                 </Label>
                 <Input
                   id="thumbnail-concurrency"
@@ -215,27 +216,27 @@ export function SystemPage() {
               </div>
               <Button type="submit" disabled={busy}>
                 <Settings2 />
-                保存设置
+                Save settings
               </Button>
             </form>
           )}
         </Card>
         <Card
-          title="原生服务"
+          title="Native services"
           description={
             managedNetwork
-              ? "独立管理模式可在这里交还原生网络。"
-              : "无线连接由相机本身管理。"
+              ? "You can restore native networking here from independent management mode."
+              : "Wireless connections are managed by the camera."
           }
         >
           <div className="flex flex-wrap items-center gap-3">
-            <Badge>DJI 网络：{native.data?.status ?? "未知"}</Badge>
-            {networkBusy && <Badge>网络操作进行中</Badge>}
+            <Badge>DJI network: {native.data?.status ?? "Unknown"}</Badge>
+            {networkBusy && <Badge>Network operation in progress</Badge>}
             <a
               href="#/network"
               className="text-sm text-primary underline underline-offset-4"
             >
-              查看完整网络状态
+              View full network status
             </a>
           </div>
           {native.isError && (
@@ -252,66 +253,66 @@ export function SystemPage() {
             {managedNetwork && (
               <>
                 <ConfirmButton
-                  title="交还原生网络？"
-                  description="停止本应用拥有的无线进程并启动 DJI 原生网络服务。当前 WiFi 连接可能断开；返回排队成功不代表切换已经完成。"
+                  title="Restore the native network?"
+                  description="Stops wireless processes owned by this application and starts DJI native networking. The current Wi-Fi connection may disconnect; a queued response does not mean the switch has completed."
                   disabled={!hardware || busy || networkBusy}
                   onConfirm={() =>
                     perform(
                       "dji_network",
                       { action: "start", confirm: true },
-                      "已提交原生网络启动请求，请观察网络状态。",
+                      "Native network start request submitted. Watch the network status.",
                     )
                   }
                 >
                   <Play />
-                  启动原生网络
+                  Start native networking
                 </ConfirmButton>
                 <ConfirmButton
-                  title="停止原生网络？"
-                  description="将通过独立网络单元停止 DJI 网络服务，可能断开当前连接。请确保 ADB 可用于恢复。"
+                  title="Stop native networking?"
+                  description="Stops DJI networking through the independent network unit and may disconnect the current session. Make sure ADB is available for recovery."
                   disabled={!hardware || busy || networkBusy}
                   onConfirm={() =>
                     perform(
                       "dji_network",
                       { action: "stop", confirm: true },
-                      "已提交原生网络停止请求。",
+                      "Native network stop request submitted.",
                     )
                   }
                 >
                   <Square />
-                  停止原生网络
+                  Stop native networking
                 </ConfirmButton>
               </>
             )}
             <details className="basis-full rounded-lg border p-3">
               <summary className="cursor-pointer text-sm font-medium">
-                高级：停止原生相机服务
+                Advanced: stop native camera services
               </summary>
               <p className="my-3 text-sm text-muted-foreground">
-                此操作会中断原生拍摄、屏幕和 Mimo 连接。
+                Interrupts native capture, displays, and the Mimo connection.
               </p>
               <ConfirmButton
-                title="停止原生相机服务？"
-                description="停止原生相机、屏幕和 Mimo 通信服务并显示双屏保护提示。原生网络单独管理。此操作不会自动开始采集，需整机重启恢复相机原生功能。"
+                title="Stop native camera services?"
+                description="Stops the native camera, displays, and Mimo communication service, then shows a protection notice on both displays. Native networking is managed separately. This does not start capture automatically. A full camera reboot is required to restore native functionality."
                 disabled={!hardware || busy}
                 variant="destructive"
                 onConfirm={() =>
                   perform(
                     "dji_kill_all",
                     { confirm: true, takeover_native: true },
-                    "原生相机服务已停止；需整机重启恢复。",
+                    "Native camera services stopped. A full reboot is required to restore them.",
                   )
                 }
               >
                 <ShieldAlert />
-                停止原生相机服务
+                Stop native camera services
               </ConfirmButton>
             </details>
           </div>
         </Card>
         <Card
-          title="命令执行"
-          description="请求—响应式 root Shell，不是 PTY。工作目录随本页面显式发送；不支持 vim 等交互程序。"
+          title="Run command"
+          description="A request/response root shell, without a PTY. The working directory is sent with each request. Interactive programs such as vim are not supported."
         >
           <form
             className="space-y-4"
@@ -337,7 +338,7 @@ export function SystemPage() {
           >
             <div className="grid gap-4 sm:grid-cols-[1fr_160px]">
               <div>
-                <Label htmlFor="shell-cwd">工作目录</Label>
+                <Label htmlFor="shell-cwd">Working directory</Label>
                 <Input
                   id="shell-cwd"
                   value={cwd}
@@ -347,7 +348,7 @@ export function SystemPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="shell-timeout">超时（秒）</Label>
+                <Label htmlFor="shell-timeout">Timeout (seconds)</Label>
                 <Input
                   id="shell-timeout"
                   type="number"
@@ -360,7 +361,7 @@ export function SystemPage() {
               </div>
             </div>
             <div>
-              <Label htmlFor="shell-command">命令</Label>
+              <Label htmlFor="shell-command">Command</Label>
               <Textarea
                 id="shell-command"
                 className="min-h-28 font-mono"
@@ -375,22 +376,22 @@ export function SystemPage() {
               disabled={!hardware || busy || !command.trim()}
             >
               <Terminal />
-              {busy ? "操作进行中" : "执行命令"}
+              {busy ? "Operation in progress" : "Run command"}
             </Button>
           </form>
           {result && (
             <div className="mt-4 space-y-3">
-              <Badge>退出码：{result.exit_code}</Badge>
+              <Badge>Exit code: {result.exit_code}</Badge>
               <div>
                 <p className="mb-2 text-xs text-muted-foreground">stdout</p>
                 <pre className="terminal-output">
-                  {result.stdout || "（无输出）"}
+                  {result.stdout || "(no output)"}
                 </pre>
               </div>
               <div>
                 <p className="mb-2 text-xs text-muted-foreground">stderr</p>
                 <pre className="terminal-output">
-                  {result.stderr || "（无输出）"}
+                  {result.stderr || "(no output)"}
                 </pre>
               </div>
             </div>
@@ -402,112 +403,114 @@ export function SystemPage() {
           className="rounded-xl border bg-card p-5"
         >
           <summary className="cursor-pointer font-semibold">
-            高级维护与重启
+            Advanced maintenance and reboot
           </summary>
           <div className="mt-5 space-y-5">
             <Notice tone="warning">
-              这些操作会中断采集或连接。Fastboot / EDL
-              不是普通重启，网页无法完成后续恢复。卸载也不撤销 BL 解锁、root ADB
-              或 Factory Mode。
+              These operations interrupt capture or connections. Fastboot / EDL
+              are not normal restarts; recovery cannot be completed from this
+              page. Uninstalling also does not undo bootloader unlocking, root
+              ADB, or Factory Mode.
             </Notice>
             <MediaIndexCard
               storage="emulated"
-              label="相机存储"
+              label="Camera storage"
               hardware={hardware}
               busy={busy}
               perform={perform}
             />
             <MediaIndexCard
               storage="sd"
-              label="SD 卡"
+              label="SD card"
               hardware={hardware}
               busy={busy}
               perform={perform}
             />
             <div className="flex flex-wrap gap-2">
               <ConfirmButton
-                title="重启面板？"
-                description="停止本面板拥有的采集和命令进程，然后重新启动 HTTP 服务。独立 WiFi 单元不会被面板重启停止；不会自动重新开始采集。"
+                title="Restart console?"
+                description="Stops capture and command processes owned by this console, then restarts the HTTP service. Independent Wi-Fi units keep running. Capture does not restart automatically."
                 disabled={!hardware || busy}
                 onConfirm={() =>
                   perform(
                     "restart_dashboard",
                     { confirm: true },
-                    "面板重启请求已提交；请等待重新连接后刷新页面。",
+                    "Console restart requested. Wait for reconnection, then refresh the page.",
                   )
                 }
               >
                 <RotateCcw />
-                重启面板
+                Restart console
               </ConfirmButton>
               <ConfirmButton
-                title="清理缩略图缓存？"
-                description="仅清理 Action Control 自己生成的缩略图，不删除相机照片或视频。"
+                title="Clear thumbnail cache?"
+                description="Only clears thumbnails generated by Action Control. Camera photos and videos are kept."
                 disabled={busy}
                 onConfirm={() =>
                   perform(
                     "clear_cache",
                     { confirm: true },
-                    "应用缩略图缓存已清理。",
+                    "Application thumbnail cache cleared.",
                   )
                 }
               >
                 <Eraser />
-                清理缓存
+                Clear cache
               </ConfirmButton>
               <ConfirmButton
-                title="清理应用日志？"
-                description="仅清理 Action Control 私有日志，不清理 DJI 原生日志或其他程序文件。"
+                title="Clear application logs?"
+                description="Only clears private Action Control logs, leaving DJI logs and other application files untouched."
                 disabled={busy}
                 onConfirm={() =>
                   perform(
                     "clear_logs",
                     { confirm: true },
-                    "应用私有日志已清理；systemd journal 不在此范围内。",
+                    "Private application logs cleared. The systemd journal is not included.",
                   )
                 }
               >
                 <Trash2 />
-                清理日志
+                Clear logs
               </ConfirmButton>
             </div>
             <div className="flex flex-wrap gap-2">
               {[
                 {
                   mode: "normal",
-                  label: "整机重启",
-                  detail: "将中断所有采集和连接；重新开机后恢复原生运行态。",
+                  label: "Reboot camera",
+                  detail:
+                    "Interrupts all capture and connections. Native functionality is restored after reboot.",
                 },
                 {
                   mode: "recovery",
                   label: "Recovery",
                   detail:
-                    "进入恢复模式，网页会离线。不要在恢复环境中误清除媒体。",
+                    "Enters recovery mode. The web interface goes offline. Avoid accidentally clearing media in recovery.",
                 },
                 {
                   mode: "bootloader",
                   label: "Fastboot",
                   detail:
-                    "进入 Bootloader，网页和普通 ADB 将离线。需要主机 Fastboot 工具恢复。",
+                    "Enters the bootloader. The web interface and normal ADB go offline. Host Fastboot tools are required for recovery.",
                 },
                 {
                   mode: "edl",
                   label: "EDL / 9008",
                   detail:
-                    "进入 Qualcomm 9008 下载模式。需要对应主机工具；没有恢复准备请取消。",
+                    "Enters Qualcomm 9008 download mode. Appropriate host tools are required. Cancel if recovery is not prepared.",
                 },
               ].map((item) => (
                 <ConfirmButton
                   key={item.mode}
                   variant="destructive"
-                  title={`确认${item.label}？`}
+                  title={`Confirm ${item.label}?`}
                   description={item.detail}
                   disabled={!hardware || busy}
                   onConfirm={() =>
                     perform(
                       "reboot",
                       { mode: item.mode, confirm: true },
-                      `${item.label}请求已提交；连接中断不能证明启动过程已完成。`,
+                      `${item.label}: request submitted. A disconnected session does not confirm startup has completed.`,
                     )
                   }
                 >
@@ -518,22 +521,27 @@ export function SystemPage() {
             </div>
           </div>
         </details>
-        <Card title="关于 Action Control">
+        <Card title="About Action Control">
           <div className="flex items-start gap-3">
             <Info className="mt-1 size-5 shrink-0 text-primary" />
             <div className="space-y-2 text-sm">
               <p>
-                版本{" "}
+                Version{" "}
                 <span className="font-mono">{health.data?.version ?? "—"}</span>{" "}
-                · Go 后端与内嵌 React 网页
+                · Go backend with embedded React interface
               </p>
               <p className="text-muted-foreground">
-                HTTP 管理与媒体接口不设登录认证；这是 root 管理服务，请仅通过
-                ADB 转发或可信网络访问。TCP 视频同样没有认证。
+                HTTP management and media endpoints have no login
+                authentication. This service runs as root; access it only
+                through ADB forwarding or a trusted network. TCP video also has
+                no authentication.
               </p>
               <p className="text-muted-foreground">
-                系统：{hardware ? "相机 root 服务" : "本地文件模式或设备不可用"}{" "}
-                · 推流协议：MPEG-TS / H.264
+                System:{" "}
+                {hardware
+                  ? "Camera root service"
+                  : "Local filesystem mode or device unavailable"}{" "}
+                · Stream format: MPEG-TS / H.264
               </p>
             </div>
           </div>

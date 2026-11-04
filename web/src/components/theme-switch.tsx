@@ -39,18 +39,22 @@ export function ThemeSwitch({
         >
           <Sun className="size-[1.2rem] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
           <Moon className="absolute size-[1.2rem] scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
-          <span className="sr-only">切换主题</span>
+          <span className="sr-only">Switch theme</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {([
-          ["light", "浅色"],
-          ["dark", "深色"],
-          ["auto", "跟随系统"],
-        ] as const).map(([value, label]) => (
+        {(
+          [
+            ["light", "Light"],
+            ["dark", "Dark"],
+            ["auto", "System"],
+          ] as const
+        ).map(([value, label]) => (
           <DropdownMenuItem key={value} onClick={() => onThemeChange(value)}>
             {label}
-            <Check className={cn("ms-auto size-3.5", theme !== value && "hidden")} />
+            <Check
+              className={cn("ms-auto size-3.5", theme !== value && "hidden")}
+            />
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

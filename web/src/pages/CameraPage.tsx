@@ -42,13 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Card,
-  Notice,
-  PageHeader,
-  Spinner,
-  formatBytes,
-} from "../ui";
+import { Card, Notice, PageHeader, Spinner, formatBytes } from "../ui";
 import { ConfirmButton } from "../dialogs";
 
 const resolutions = [
@@ -64,41 +58,43 @@ const resolutions = [
 const qualityRates = [2, 6, 15, 999];
 
 const nativeStateLabels: Record<NativeServiceState, string> = {
-  running: "服务运行中",
-  stopped: "服务已停止",
-  failed: "服务启动失败",
-  transitioning: "服务切换中",
-  degraded: "部分服务未运行",
-  unknown: "服务状态未知",
-  unavailable: "本地模式",
+  running: "Service running",
+  stopped: "Service stopped",
+  failed: "Service failed to start",
+  transitioning: "Switching services",
+  degraded: "Some services are not running",
+  unknown: "Service status unknown",
+  unavailable: "Local mode",
 };
 const nativeServiceLabels: Record<string, string> = {
-  "dji_camera3.service": "原生拍摄服务",
-  "dji_media.service": "媒体服务",
-  "gui.service": "主屏界面",
-  "sub_gui.service": "副屏界面",
-  "dji_sw_uav.service": "Mimo 通信服务",
+  "dji_camera3.service": "Native camera services",
+  "dji_media.service": "Media service",
+  "gui.service": "Main display UI",
+  "sub_gui.service": "Secondary display UI",
+  "dji_sw_uav.service": "Mimo communication service",
 };
 
 function nativeRecordingLabel(status: NativeCameraStatus) {
-  if (status.recording === true) return "录像中";
-  if (status.recording === false) return "未录像";
+  if (status.recording === true) return "Recording";
+  if (status.recording === false) return "Not recording";
   if (status.native_state.status === "ok")
-    return `状态待识别（代码 ${status.native_state.record_state}）`;
+    return `Unrecognized state (code ${status.native_state.record_state})`;
   if (status.native_state.status === "unsupported_firmware")
-    return "当前固件尚未适配";
-  if (status.service_state === "unavailable") return "本地模式不可用";
-  return "未知";
+    return "Current firmware not supported yet";
+  if (status.service_state === "unavailable")
+    return "Unavailable in local mode";
+  return "Unknown";
 }
 
 function nativeVideoSettingsLabel(status: NativeCameraStatus) {
   const v = status.native_state.video_settings;
   if (status.native_state.status !== "ok" || !v) return "—";
   const parts = [
-    v.resolution_label || (v.resolution !== null ? `分辨率 ${v.resolution}` : null),
+    v.resolution_label ||
+      (v.resolution !== null ? `Resolution ${v.resolution}` : null),
     v.fps_label ? `${v.fps_label}fps` : v.fps !== null ? `${v.fps}fps` : null,
-    v.codec !== null ? `编码 ${v.codec}` : null,
-    v.eis_label ? `防抖 ${v.eis_label}` : null,
+    v.codec !== null ? `Codec ${v.codec}` : null,
+    v.eis_label ? `Stabilization ${v.eis_label}` : null,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : "—";
 }
@@ -143,7 +139,7 @@ export function CameraPage() {
       );
     } catch (error) {
       setNativeError(
-        `原生请求未完整返回：${errorText(error)}。请先检查相机当前状态，再决定下一步操作。`,
+        `Incomplete native response: ${errorText(error)}. Check the current camera state before proceeding.`,
       );
     } finally {
       await invalidate("native_camera_status");
@@ -159,8 +155,8 @@ export function CameraPage() {
   return (
     <>
       <PageHeader
-        title="相机"
-        description="复用相机原生录像控制，并同步 Mimo 的实时画面。"
+        title="Camera"
+        description="Use native camera recording controls and relay live video from Mimo."
         actions={
           <Button
             variant="outline"
@@ -170,29 +166,30 @@ export function CameraPage() {
             }
           >
             <RefreshCw />
-            刷新状态
+            Refresh status
           </Button>
         }
       />
       {capture.data?.reboot_required && (
         <div className="mb-4">
           <Notice tone="warning">
-            原生服务已受影响，停止独立采集后仍需整机重启恢复。
+            Native services have been affected. A full reboot is required even
+            after stopping independent capture.
             <a
               href="#/system?section=maintenance"
               className="ml-2 underline underline-offset-4"
             >
-              前往重启
+              Go to reboot
             </a>
           </Notice>
         </div>
       )}
-      <Card title="原生相机">
+      <Card title="Native camera">
         {native.isPending ? (
           <Spinner />
         ) : native.isError ? (
           <Notice tone="warning">
-            无法读取原生服务状态：{native.error.message}
+            Cannot read native service status: {native.error.message}
           </Notice>
         ) : (
           <>
@@ -212,40 +209,44 @@ export function CameraPage() {
             )}
             <dl className="mt-5 grid grid-cols-2 gap-4 text-sm">
               <div>
-                <dt className="text-muted-foreground">原生录像状态</dt>
+                <dt className="text-muted-foreground">
+                  Native recording status
+                </dt>
                 <dd className="mt-1">{nativeRecordingLabel(native.data)}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">原生工作模式</dt>
+                <dt className="text-muted-foreground">Native operating mode</dt>
                 <dd className="mt-1">
                   {native.data.native_state.status === "ok" &&
                   native.data.native_state.workmode !== null
-                    ? `代码 ${native.data.native_state.workmode}`
+                    ? `Code ${native.data.native_state.workmode}`
                     : "—"}
                 </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">拍摄模式档</dt>
+                <dt className="text-muted-foreground">Capture mode</dt>
                 <dd className="mt-1">
                   {native.data.native_state.status === "ok" &&
                   native.data.native_state.mode_profile !== null
-                    ? `代码 ${native.data.native_state.mode_profile}`
+                    ? `Code ${native.data.native_state.mode_profile}`
                     : "—"}
                 </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">视频设置</dt>
-                <dd className="mt-1">{nativeVideoSettingsLabel(native.data)}</dd>
+                <dt className="text-muted-foreground">Video settings</dt>
+                <dd className="mt-1">
+                  {nativeVideoSettingsLabel(native.data)}
+                </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">网页预览</dt>
-                <dd className="mt-1">下方连接 Mimo 画面</dd>
+                <dt className="text-muted-foreground">Web preview</dt>
+                <dd className="mt-1">Connect to Mimo video below</dd>
               </div>
             </dl>
             <p className="mt-3 text-xs text-muted-foreground">
               {native.data.native_state.status === "ok"
-                ? `相机原生状态 · 最近读取 ${new Date(native.data.native_state.observed_at!).toLocaleTimeString()} · 每 5 秒刷新`
-                : "暂时无法读取原生录像状态，稍后自动重试。"}
+                ? `Native camera state · Last read ${new Date(native.data.native_state.observed_at!).toLocaleTimeString()} · Refreshes every 5 seconds`
+                : "Native recording status is temporarily unavailable. Retrying automatically."}
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <Button
@@ -258,8 +259,8 @@ export function CameraPage() {
               >
                 <Play />
                 {nativeAction === "start_recording"
-                  ? "正在请求开始…"
-                  : "开始录像"}
+                  ? "Requesting start…"
+                  : "Start recording"}
               </Button>
               <Button
                 variant="outline"
@@ -272,8 +273,8 @@ export function CameraPage() {
               >
                 <Square />
                 {nativeAction === "stop_recording"
-                  ? "正在请求停止…"
-                  : "停止录像"}
+                  ? "Requesting stop…"
+                  : "Stop recording"}
               </Button>
               <Button
                 variant="outline"
@@ -285,7 +286,9 @@ export function CameraPage() {
                 onClick={() => void runNative("capture")}
               >
                 <Camera />
-                {nativeAction === "capture" ? "正在请求拍照…" : "拍照"}
+                {nativeAction === "capture"
+                  ? "Requesting photo…"
+                  : "Take photo"}
               </Button>
               <Button
                 variant="outline"
@@ -297,7 +300,9 @@ export function CameraPage() {
                 onClick={() => void runNative("mode_photo")}
               >
                 <Aperture />
-                {nativeAction === "mode_photo" ? "正在切换…" : "切到拍照"}
+                {nativeAction === "mode_photo"
+                  ? "Switching…"
+                  : "Switch to photo"}
               </Button>
               <Button
                 variant="outline"
@@ -309,11 +314,14 @@ export function CameraPage() {
                 onClick={() => void runNative("mode_video")}
               >
                 <Video />
-                {nativeAction === "mode_video" ? "正在切换…" : "切到视频"}
+                {nativeAction === "mode_video"
+                  ? "Switching…"
+                  : "Switch to video"}
               </Button>
             </div>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              沿用相机当前拍摄设置，录像和照片均由相机保存。拍照仅在相机空闲时可用。
+              Uses the current camera settings. Recordings and photos are saved
+              by the camera. Photos can only be taken while the camera is idle.
             </p>
             {nativeResult && (
               <div className="mt-4">
@@ -327,12 +335,14 @@ export function CameraPage() {
                 >
                   <span className="block">{nativeResult.message}</span>
                   <span className="mt-1 block text-xs opacity-80">
-                    上次操作 ·{" "}
+                    Last operation ·{" "}
                     {new Date(nativeResult.completed_at).toLocaleTimeString()}
                   </span>
                   {nativeResult.reason && (
                     <details className="mt-2 text-xs">
-                      <summary className="cursor-pointer">查看操作详情</summary>
+                      <summary className="cursor-pointer">
+                        View operation details
+                      </summary>
                       <p className="mt-1">{nativeResult.reason}</p>
                     </details>
                   )}
@@ -347,7 +357,7 @@ export function CameraPage() {
             {native.data.services.length > 0 && (
               <details className="mt-5 rounded-lg border p-3">
                 <summary className="cursor-pointer text-sm font-medium">
-                  查看原生服务详情
+                  View native service details
                 </summary>
                 <dl className="mt-4 space-y-3 text-sm">
                   {native.data.services.map((service) => (
@@ -365,11 +375,12 @@ export function CameraPage() {
                   ))}
                 </dl>
                 <p className="mt-4 text-xs text-muted-foreground">
-                  Mimo 通信服务运行不代表手机已连接。
+                  A running Mimo communication service does not mean a phone is
+                  connected.
                 </p>
                 {native.data.native_state.reason && (
                   <p className="mt-3 break-words text-xs text-muted-foreground">
-                    录像状态读取：{native.data.native_state.reason}
+                    Recording status: {native.data.native_state.reason}
                   </p>
                 )}
               </details>
@@ -391,10 +402,14 @@ export function CameraPage() {
         onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
         className="mt-6 rounded-xl border bg-card p-5"
       >
-        <summary className="cursor-pointer font-medium">高级：独立采集</summary>
+        <summary className="cursor-pointer font-medium">
+          Advanced: independent capture
+        </summary>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          独立采集会中断原生拍摄、屏幕和 Mimo 连接，恢复原生功能需要重启相机。
-          展开此处只查看设置；启动时才会接管相机。
+          Independent capture interrupts native capture, displays, and the Mimo
+          connection. Reboot the camera to restore native functionality.
+          Expanding this section only shows settings. Camera takeover happens
+          when capture starts.
         </p>
         {advancedOpen && (
           <div className="mt-5">
@@ -419,7 +434,7 @@ function IndependentCapture() {
     [notice, setNotice] = useState("");
   const [preview, setPreview] = useState(true),
     [attempt, setAttempt] = useState(0);
-  const [playback, setPlayback] = useState("预览未连接"),
+  const [playback, setPlayback] = useState("Preview not connected"),
     [playbackError, setPlaybackError] = useState("");
   const video = useRef<HTMLVideoElement>(null),
     form = useRef<HTMLFormElement>(null),
@@ -440,7 +455,7 @@ function IndependentCapture() {
   }, [config.data]);
   useEffect(() => {
     if (!running || !preview) {
-      setPlayback("预览未连接");
+      setPlayback("Preview not connected");
       setPlaybackError("");
       return;
     }
@@ -459,7 +474,7 @@ function IndependentCapture() {
         const features = mpegts.getFeatureList();
         if (!features.mseLivePlayback)
           throw new Error(
-            "此浏览器不支持 MPEG-TS 实时播放，请使用外部 TCP 播放器。",
+            "This browser does not support live MPEG-TS playback. Use an external TCP player.",
           );
         player = mpegts.createPlayer(
           {
@@ -479,9 +494,9 @@ function IndependentCapture() {
         );
         player.on(mpegts.Events.ERROR, (kind: string, detail: string) => {
           if (!controller.signal.aborted) {
-            setPlayback("预览错误");
+            setPlayback("Preview error");
             setPlaybackError(
-              `${kind}: ${detail}。此错误不代表设备已停止采集。`,
+              `${kind}: ${detail}. This error does not mean capture has stopped.`,
             );
             destroy();
           }
@@ -492,16 +507,16 @@ function IndependentCapture() {
           await player.play();
         } catch (e) {
           if (!controller.signal.aborted) {
-            setPlayback("等待手动播放");
+            setPlayback("Waiting for manual playback");
             setPlaybackError(
-              `浏览器未开始播放：${errorText(e)}。可点击视频播放按钮。`,
+              `Browser playback did not start: ${errorText(e)}. You can click the video play button.`,
             );
           }
         }
       })
       .catch((e) => {
         if (!controller.signal.aborted) {
-          setPlayback("预览不可用");
+          setPlayback("Preview unavailable");
           setPlaybackError(errorText(e));
           destroy();
         }
@@ -524,7 +539,7 @@ function IndependentCapture() {
       );
     } catch (e) {
       setError(
-        `${errorText(e)}。如果连接中断，先刷新采集状态，不要立即重复操作。`,
+        `${errorText(e)}. If disconnected, refresh capture status before repeating any operation.`,
       );
       throw e;
     } finally {
@@ -569,7 +584,7 @@ function IndependentCapture() {
       link.download = `snapshot-${new Date().toISOString().replaceAll(":", "-")}.jpg`;
       link.click();
       setTimeout(() => URL.revokeObjectURL(object), 1000);
-      setNotice("截图已交给浏览器下载。");
+      setNotice("Snapshot sent to the browser for download.");
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -597,24 +612,25 @@ function IndependentCapture() {
     },
   ];
   const captureState = status.isPending
-    ? "正在读取"
+    ? "Reading"
     : status.isError
-      ? "状态未知"
+      ? "Unknown status"
       : running
-        ? "运行中"
+        ? "Running"
         : transition
-          ? "切换中"
+          ? "Switching"
           : status.data?.state === "error"
-            ? "失败"
-            : "已停止";
+            ? "Failed"
+            : "Stopped";
 
   return (
     <div className="pb-24 md:pb-0">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">独立采集</h2>
+          <h2 className="text-lg font-semibold">Independent capture</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            此处的参数和状态仅属于 Action Control 自己的采集。
+            These settings and status apply only to capture managed by Action
+            Control.
           </p>
         </div>
         <Button
@@ -623,13 +639,14 @@ function IndependentCapture() {
           disabled={status.isFetching}
         >
           <RefreshCw />
-          刷新独立采集状态
+          Refresh independent capture status
         </Button>
       </div>
       {status.isError && (
         <div className="mb-4">
           <Notice tone="warning">
-            采集状态未知：{status.error.message}。恢复连接后请先确认状态。
+            Capture status unknown: {status.error.message}. Check the status
+            after reconnecting.
           </Notice>
         </div>
       )}
@@ -644,18 +661,18 @@ function IndependentCapture() {
         </div>
       )}
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <Card title="实时预览">
+        <Card title="Live preview">
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <Badge
               variant={running && !status.isError ? "default" : "secondary"}
             >
-              独立采集：{captureState}
+              Independent capture: {captureState}
             </Badge>
-            <Badge variant="secondary">浏览器：{playback}</Badge>
+            <Badge variant="secondary">Browser: {playback}</Badge>
             {running && !status.isError && (
               <span className="text-xs tabular-nums text-muted-foreground">
-                {Math.floor(status.data!.uptime_sec / 60)} 分{" "}
-                {Math.floor(status.data!.uptime_sec % 60)} 秒
+                {Math.floor(status.data!.uptime_sec / 60)} min{" "}
+                {Math.floor(status.data!.uptime_sec % 60)} sec
               </span>
             )}
           </div>
@@ -668,19 +685,20 @@ function IndependentCapture() {
               playsInline
               autoPlay
               onPlaying={() => {
-                setPlayback("正在播放");
+                setPlayback("Playing");
                 setPlaybackError("");
               }}
               onPause={() => {
-                if (running && preview) setPlayback("预览暂停");
+                if (running && preview) setPlayback("Preview paused");
               }}
               onWaiting={() => {
-                if (running && preview) setPlayback("预览缓冲中");
+                if (running && preview) setPlayback("Buffering preview");
               }}
               onError={() => {
                 if (running && preview)
                   setPlaybackError(
-                    video.current?.error?.message || "浏览器无法解码当前视频。",
+                    video.current?.error?.message ||
+                      "This browser cannot decode the current video.",
                   );
               }}
             />
@@ -689,10 +707,10 @@ function IndependentCapture() {
                 <Camera className="size-10" />
                 <p className="text-sm">
                   {status.isError
-                    ? "等待设备状态恢复"
+                    ? "Waiting for device status to recover"
                     : running
-                      ? "预览已关闭 · 设备继续采集"
-                      : "启动采集后显示画面"}
+                      ? "Preview closed · Capture continues on device"
+                      : "Show video after capture starts"}
                 </p>
               </div>
             )}
@@ -709,15 +727,15 @@ function IndependentCapture() {
                 running ||
                 transition
               }
-              title="接管相机并启动独立采集？"
-              description="将停止原生相机、屏幕和 Mimo 通信服务。即使启动失败或随后停止，仍可能需要整机重启才能恢复原生功能。"
+              title="Take over the camera and start independent capture?"
+              description="Stops native camera, display, and Mimo communication services. A full reboot may be needed to restore native functionality, even if capture fails to start or is stopped later."
               onConfirm={async () => {
                 if (!draft || !form.current)
-                  throw new Error("采集参数尚未就绪。");
+                  throw new Error("Capture settings are not ready.");
                 if (!form.current.checkValidity()) {
                   if (advanced.current) advanced.current.open = true;
                   form.current.reportValidity();
-                  throw new Error("请修正采集参数。");
+                  throw new Error("Check the capture settings.");
                 }
                 await control("camera_start", {
                   width: draft.cam_w,
@@ -732,7 +750,7 @@ function IndependentCapture() {
               }}
             >
               <Play />
-              启动独立采集
+              Start independent capture
             </ConfirmButton>
             <Button
               variant="outline"
@@ -746,10 +764,10 @@ function IndependentCapture() {
               onClick={() => void control("camera_stop").catch(() => {})}
             >
               <Square />
-              停止独立采集
+              Stop independent capture
             </Button>
             <span className="ml-auto text-xs text-muted-foreground md:ml-1">
-              {!hardware ? "未连接相机" : captureState}
+              {!hardware ? "Camera not connected" : captureState}
             </span>
           </div>
           {playbackError && (
@@ -767,14 +785,16 @@ function IndependentCapture() {
               }}
             >
               <Play />
-              {preview && playback === "正在播放" ? "重新连接" : "连接预览"}
+              {preview && playback === "Playing"
+                ? "Reconnect"
+                : "Connect preview"}
             </Button>
             <Button
               variant="ghost"
               disabled={!running || !preview}
               onClick={() => setPreview(false)}
             >
-              关闭预览
+              Close preview
             </Button>
             <Button
               variant="outline"
@@ -782,7 +802,7 @@ function IndependentCapture() {
               onClick={() => void snapshot()}
             >
               <Download />
-              截图
+              Snapshot
             </Button>
             <Button
               variant="ghost"
@@ -792,16 +812,17 @@ function IndependentCapture() {
                   void video.current
                     .requestFullscreen()
                     .catch((cause) => setError(errorText(cause)));
-                else setError("此浏览器不支持视频全屏。");
+                else
+                  setError("This browser does not support fullscreen video.");
               }}
             >
               <Maximize />
-              全屏
+              Fullscreen
             </Button>
           </div>
           <dl className="mt-5 grid grid-cols-2 gap-4 border-t pt-5 text-sm sm:grid-cols-4">
             <div>
-              <dt className="text-muted-foreground">采集参数</dt>
+              <dt className="text-muted-foreground">Capture settings</dt>
               <dd className="mt-1 font-mono">
                 {status.data
                   ? `${status.data.width} × ${status.data.height}`
@@ -809,11 +830,11 @@ function IndependentCapture() {
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">配置帧率</dt>
+              <dt className="text-muted-foreground">Configured frame rate</dt>
               <dd className="mt-1 font-mono">{status.data?.fps ?? "—"} fps</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">平均输出码率</dt>
+              <dt className="text-muted-foreground">Average output bitrate</dt>
               <dd className="mt-1 font-mono">
                 {running
                   ? `${(status.data!.bitrate_kbps / 1000).toFixed(2)} Mbps`
@@ -821,7 +842,7 @@ function IndependentCapture() {
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">输出 / 客户端</dt>
+              <dt className="text-muted-foreground">Output / clients</dt>
               <dd className="mt-1 font-mono">
                 {formatBytes(status.data?.bytes_sent)} /{" "}
                 {status.data?.clients ?? "—"}
@@ -830,8 +851,8 @@ function IndependentCapture() {
           </dl>
         </Card>
         <Card
-          title="采集参数"
-          description="先选择常用组合，需要时再调整详细参数。"
+          title="Capture settings"
+          description="Choose a preset first, then adjust detailed settings if needed."
         >
           {config.isError ? (
             <Notice tone="error">{config.error.message}</Notice>
@@ -848,7 +869,7 @@ function IndependentCapture() {
                 className="space-y-4 disabled:opacity-60"
               >
                 <div>
-                  <Label htmlFor="capture-profile">常用组合</Label>
+                  <Label htmlFor="capture-profile">Presets</Label>
                   <Select
                     value={
                       commonPresets.some((item) => item.value === common)
@@ -880,24 +901,25 @@ function IndependentCapture() {
                           {item.label}
                         </SelectItem>
                       ))}
-                      <SelectItem value="custom">自定义参数</SelectItem>
+                      <SelectItem value="custom">Custom settings</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                    可用性以本机启动结果为准。
+                    Availability depends on whether capture starts successfully
+                    on this device.
                   </p>
                 </div>
                 {lastSuccess && (
                   <div className="rounded-lg border p-3 text-sm">
-                    <p className="font-medium">最近成功启动</p>
+                    <p className="font-medium">Last successful capture</p>
                     <p className="mt-1 text-muted-foreground">
                       {lastSuccess.config.cam_w} × {lastSuccess.config.cam_h} ·{" "}
                       {lastSuccess.config.cam_fps} fps
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {new Date(lastSuccess.saved_at).toLocaleString("zh-CN")}
+                      {new Date(lastSuccess.saved_at).toLocaleString("en-US")}
                       {!lastSuccess.firmware_match
-                        ? " · 当前固件未确认一致，需重新验证"
+                        ? " · Firmware match unconfirmed; revalidation required"
                         : ""}
                     </p>
                     <Button
@@ -908,25 +930,27 @@ function IndependentCapture() {
                       onClick={() => {
                         setDraft({ ...draft, ...lastSuccess.config });
                         setNotice(
-                          "已填入上次成功启动的参数，点击启动采集后生效。",
+                          "Settings from the last successful capture loaded. Start capture to apply them.",
                         );
                       }}
                     >
                       <RotateCcw />
-                      使用此参数
+                      Use these settings
                     </Button>
                   </div>
                 )}
                 <details ref={advanced} className="rounded-lg border p-3">
                   <summary className="cursor-pointer text-sm font-medium">
-                    高级与实验参数
+                    Advanced and experimental settings
                   </summary>
                   <p className="mt-3 text-xs leading-5 text-muted-foreground">
-                    未验证的分辨率、帧率组合可能无法启动。码率参考值用于调整画质，实际输出见预览下方。
+                    Untested resolution and frame rate combinations may fail to
+                    start. The bitrate reference adjusts quality; actual output
+                    is shown below the preview.
                   </p>
                   <div className="mt-4 space-y-4">
                     <div>
-                      <Label htmlFor="camera-preset">分辨率</Label>
+                      <Label htmlFor="camera-preset">Resolution</Label>
                       <Select
                         value={
                           resolutions.includes(`${draft.cam_w}x${draft.cam_h}`)
@@ -944,7 +968,7 @@ function IndependentCapture() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="custom">自定义</SelectItem>
+                          <SelectItem value="custom">Custom</SelectItem>
                           {resolutions.map((value) => (
                             <SelectItem key={value} value={value}>
                               {value.replace("x", " × ")}
@@ -955,7 +979,7 @@ function IndependentCapture() {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label htmlFor="camera-width">宽度</Label>
+                        <Label htmlFor="camera-width">Width</Label>
                         <Input
                           id="camera-width"
                           type="number"
@@ -973,7 +997,7 @@ function IndependentCapture() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="camera-height">高度</Label>
+                        <Label htmlFor="camera-height">Height</Label>
                         <Input
                           id="camera-height"
                           type="number"
@@ -993,7 +1017,9 @@ function IndependentCapture() {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label htmlFor="camera-fps">配置帧率</Label>
+                        <Label htmlFor="camera-fps">
+                          Configured frame rate
+                        </Label>
                         <Input
                           id="camera-fps"
                           type="number"
@@ -1010,7 +1036,7 @@ function IndependentCapture() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="camera-port">TCP 端口</Label>
+                        <Label htmlFor="camera-port">TCP port</Label>
                         <Input
                           id="camera-port"
                           type="number"
@@ -1028,7 +1054,7 @@ function IndependentCapture() {
                       </div>
                     </div>
                     <div>
-                      <Label htmlFor="camera-quality">画质参考</Label>
+                      <Label htmlFor="camera-quality">Quality reference</Label>
                       <Select
                         value={String(draft.cam_quality)}
                         onValueChange={(value) =>
@@ -1039,16 +1065,20 @@ function IndependentCapture() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {["较低", "一般", "较高", "极高"].map((label, i) => (
-                            <SelectItem key={i} value={String(i)}>
-                              {label}
-                            </SelectItem>
-                          ))}
+                          {["Low", "Normal", "High", "Very high"].map(
+                            (label, i) => (
+                              <SelectItem key={i} value={String(i)}>
+                                {label}
+                              </SelectItem>
+                            ),
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
-                      <Label htmlFor="camera-bitrate">码率参考值（Mbps）</Label>
+                      <Label htmlFor="camera-bitrate">
+                        Bitrate reference (Mbps)
+                      </Label>
                       <Input
                         id="camera-bitrate"
                         type="number"
@@ -1070,7 +1100,7 @@ function IndependentCapture() {
               </fieldset>
               {running && (
                 <p className="text-xs text-muted-foreground">
-                  停止采集后可修改参数。
+                  Stop capture to change settings.
                 </p>
               )}
             </form>
@@ -1079,18 +1109,20 @@ function IndependentCapture() {
       </div>
       <details className="mt-6 rounded-xl border bg-card p-5">
         <summary className="cursor-pointer font-medium">
-          外部播放器与连接帮助
+          External players and connection help
         </summary>
         <div className="mt-4 space-y-4">
           <p className="text-sm text-muted-foreground">
-            使用支持 TCP MPEG-TS / H.264 的播放器。视频端口仅在采集期间开放。
+            Use a player that supports TCP MPEG-TS / H.264. The video port is
+            open only during capture.
           </p>
           <Notice tone="warning">
-            TCP 视频端口没有访问认证或加密，仅供可信局域网使用。通过 ADB
-            访问时，还需转发下面的视频端口。
+            The TCP video port has no authentication or encryption. Use only on
+            a trusted LAN. When using ADB forwarding, also forward the video
+            port shown below.
           </Notice>
           <div>
-            <Label htmlFor="tcp-address">播放地址</Label>
+            <Label htmlFor="tcp-address">Playback URL</Label>
             <div className="flex gap-2">
               <Input
                 ref={address}
@@ -1102,17 +1134,19 @@ function IndependentCapture() {
               />
               <Button
                 variant="outline"
-                aria-label="复制播放地址"
+                aria-label="Copy playback URL"
                 onClick={async () => {
                   try {
                     if (!navigator.clipboard)
                       throw new Error("clipboard unavailable");
                     await navigator.clipboard.writeText(url);
-                    setNotice("播放地址已复制。");
+                    setNotice("Playback URL copied.");
                   } catch {
                     address.current?.focus();
                     address.current?.select();
-                    setNotice("地址已选中，请使用系统复制菜单或 Ctrl/Cmd+C。");
+                    setNotice(
+                      "Address selected. Use the system copy menu or Ctrl/Cmd+C.",
+                    );
                   }
                 }}
               >

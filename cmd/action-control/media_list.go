@@ -153,7 +153,7 @@ func (s *fileStore) mediaList(w http.ResponseWriter, r *http.Request) {
 	if value := query.Get("limit"); value != "" {
 		limit, err = strconv.Atoi(value)
 		if err != nil || limit < 1 || limit > 200 {
-			jsonError(w, 400, "invalid_page", errors.New("每页数量必须在 1–200 之间"))
+			jsonError(w, 400, "invalid_page", errors.New("Page size must be between 1 and 200"))
 			return
 		}
 	}
@@ -165,7 +165,7 @@ func (s *fileStore) mediaList(w http.ResponseWriter, r *http.Request) {
 		order = "newest"
 	}
 	if !slices.Contains([]string{"all", "image", "video"}, kind) || !slices.Contains([]string{"newest", "oldest", "name", "largest"}, order) || len(search) > 1024 {
-		jsonError(w, 400, "invalid_filter", errors.New("无效的相册筛选或排序"))
+		jsonError(w, 400, "invalid_filter", errors.New("Invalid album filter or sort order"))
 		return
 	}
 	hash := sha256.Sum256([]byte(dir + "\x00" + kind + "\x00" + search + "\x00" + order))
@@ -174,7 +174,7 @@ func (s *fileStore) mediaList(w http.ResponseWriter, r *http.Request) {
 	if value := query.Get("cursor"); value != "" {
 		data, decodeErr := base64.RawURLEncoding.DecodeString(value)
 		if len(value) > 1024 || decodeErr != nil || json.Unmarshal(data, &cursor) != nil || cursor.ID == "" || cursor.Offset < 0 || cursor.Query != fingerprint || query.Get("refresh") == "true" {
-			jsonError(w, 400, "invalid_cursor", errors.New("分页位置与当前筛选不匹配，请刷新相册"))
+			jsonError(w, 400, "invalid_cursor", errors.New("Pagination does not match the current filter; refresh the album"))
 			return
 		}
 	}
@@ -195,7 +195,7 @@ func (s *fileStore) mediaList(w http.ResponseWriter, r *http.Request) {
 	}
 	if catalog == nil && cursor.ID != "" {
 		s.mediaMu.Unlock()
-		jsonError(w, 410, "media_snapshot_expired", errors.New("媒体列表已更新或过期，请刷新后继续浏览"))
+		jsonError(w, 410, "media_snapshot_expired", errors.New("Media list changed or expired; refresh to continue browsing"))
 		return
 	}
 	if catalog == nil {
@@ -246,7 +246,7 @@ func (s *fileStore) mediaList(w http.ResponseWriter, r *http.Request) {
 		return a.Path < b.Path
 	})
 	if cursor.Offset > len(items) {
-		jsonError(w, 400, "invalid_cursor", errors.New("无效的分页位置"))
+		jsonError(w, 400, "invalid_cursor", errors.New("Invalid pagination cursor"))
 		return
 	}
 	end := min(len(items), cursor.Offset+limit)

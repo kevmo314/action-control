@@ -54,7 +54,7 @@ var nativeResolutionLabels = map[int32]string{
 var nativeFPSLabels = map[int32]string{
 	1: "24", 2: "25", 3: "30", 4: "48", 5: "50", 6: "60", 10: "100", 7: "120", 19: "200", 8: "240",
 }
-var nativeEISLabels = map[int32]string{0: "关闭", 1: "RS", 2: "HS", 3: "RS+", 4: "HB"}
+var nativeEISLabels = map[int32]string{0: "off", 1: "RS", 2: "HS", 3: "RS+", 4: "HB"}
 
 func labelVideoSettings(v *NativeVideoSettings) *NativeVideoSettings {
 	if v == nil {
@@ -126,19 +126,19 @@ func probeNativeCamera(ctx context.Context, a *App) NativeCameraObservation {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	if err := a.nativeIO.acquire(ctx); err != nil {
-		return nativeObservationError("timeout", "等待原生相机访问超时或已取消。")
+		return nativeObservationError("timeout", "Waiting for native camera access timed out or was cancelled.")
 	}
 	defer a.nativeIO.release()
 	output, err := a.Run(ctx, 3*time.Second, "python3", "-I", "-B", "-c", nativeCameraReaderScript)
 	if ctx.Err() != nil {
-		return nativeObservationError("timeout", "原生状态读取超时或已取消。")
+		return nativeObservationError("timeout", "Native status read timed out or was cancelled.")
 	}
 	if err != nil {
-		return nativeObservationError("error", "原生状态读取未完成："+err.Error())
+		return nativeObservationError("error", "Native status read incomplete: "+err.Error())
 	}
 	observation, err := decodeNativeObservation(output)
 	if err != nil {
-		return nativeObservationError("error", "原生状态结果无效："+err.Error())
+		return nativeObservationError("error", "Invalid native status result: "+err.Error())
 	}
 	return observation
 }
@@ -187,7 +187,7 @@ func (reader *nativeStateReader) invalidate() {
 func (reader *nativeStateReader) read(ctx, lifetime context.Context, pid int, probe func(context.Context) NativeCameraObservation) NativeCameraObservation {
 	for {
 		if err := ctx.Err(); err != nil {
-			return nativeObservationError("error", "状态请求已取消。")
+			return nativeObservationError("error", "Status request cancelled.")
 		}
 		reader.mu.Lock()
 		if reader.pid == pid && time.Now().Before(reader.expires) {
@@ -218,14 +218,14 @@ func (reader *nativeStateReader) read(ctx, lifetime context.Context, pid int, pr
 		reader.mu.Unlock()
 		select {
 		case <-ctx.Done():
-			return nativeObservationError("error", "状态请求已取消。")
+			return nativeObservationError("error", "Status request cancelled.")
 		case <-done:
 		}
 	}
 }
 
 func addNativeCameraObservation(ctx context.Context, a *App, status *NativeCameraStatus) {
-	status.NativeState = nativeObservationError("unavailable", "原生拍摄服务未运行，暂不查询拍摄状态。")
+	status.NativeState = nativeObservationError("unavailable", "Native camera services are not running; capture status will not be queried.")
 	for _, service := range status.Services {
 		if service.Unit != "dji_camera3.service" || service.State != "running" {
 			continue

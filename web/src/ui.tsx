@@ -130,7 +130,7 @@ export function Spinner() {
       className="inline-flex items-center gap-2 text-sm text-muted-foreground"
     >
       <ShadcnSpinner />
-      <span>正在读取…</span>
+      <span>Reading…</span>
     </span>
   );
 }
@@ -144,9 +144,9 @@ export function formatBytes(n: number | null | undefined): string {
     value /= 1024;
     index++;
   }
-  return `${value.toLocaleString("zh-CN", { maximumFractionDigits: index ? 1 : 0 })} ${units[index]}`;
+  return `${value.toLocaleString("en-US", { maximumFractionDigits: index ? 1 : 0 })} ${units[index]}`;
 }
 
 export function formatDate(seconds: number): string {
-  return new Date(seconds * 1000).toLocaleString("zh-CN", { hour12: false });
+  return new Date(seconds * 1000).toLocaleString("en-US", { hour12: false });
 }

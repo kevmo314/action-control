@@ -77,7 +77,7 @@ function Thumbnail({ item }: { item: MediaItem }) {
       {failed ? (
         <span className="flex h-full flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
           <Image className="size-7" />
-          无缩略图
+          No thumbnail
         </span>
       ) : (
         <img
@@ -94,7 +94,7 @@ function Thumbnail({ item }: { item: MediaItem }) {
         <span className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1 rounded bg-black/70 px-2 py-1 text-xs text-white">
           <Play className="size-3" />
           {duration == null
-            ? "视频"
+            ? "Video"
             : `${Math.floor(duration / 60)}:${String(Math.floor(duration % 60)).padStart(2, "0")}`}
         </span>
       )}
@@ -105,31 +105,31 @@ function Thumbnail({ item }: { item: MediaItem }) {
 function NativeMeta({ meta }: { meta: NativeMediaMeta }) {
   const entries: [string, string][] = [];
   if (meta.rating != null && meta.rating > 0)
-    entries.push(["星标", "★".repeat(Math.min(5, meta.rating))]);
-  if (meta.highlight) entries.push(["精彩标记", "是"]);
+    entries.push(["Favorite", "★".repeat(Math.min(5, meta.rating))]);
+  if (meta.highlight) entries.push(["Highlight marker", "Yes"]);
   if (meta.ev_bias != null && meta.ev_bias !== 0)
-    entries.push(["EV", `代码 ${meta.ev_bias}`]);
+    entries.push(["EV", `Code ${meta.ev_bias}`]);
   if (meta.nd_value != null && meta.nd_value > 0)
-    entries.push(["ND", `代码 ${meta.nd_value}`]);
+    entries.push(["ND", `Code ${meta.nd_value}`]);
   if (meta.ei_value != null && meta.ei_value > 0)
     entries.push(["EI", String(meta.ei_value)]);
   if (meta.aperture_raw != null && meta.aperture_raw > 0)
-    entries.push(["光圈", `f/${(meta.aperture_raw / 100).toFixed(1)}`]);
+    entries.push(["Aperture", `f/${(meta.aperture_raw / 100).toFixed(1)}`]);
   if (meta.steady_mode_raw != null)
-    entries.push(["防抖", `代码 ${meta.steady_mode_raw}`]);
+    entries.push(["Stabilization", `Code ${meta.steady_mode_raw}`]);
   if (meta.fov_type_raw != null)
-    entries.push(["视角", `代码 ${meta.fov_type_raw}`]);
+    entries.push(["Field of view", `Code ${meta.fov_type_raw}`]);
   if (meta.rotation != null && meta.rotation !== 0)
-    entries.push(["旋转", `${meta.rotation}°`]);
+    entries.push(["Rotation", `${meta.rotation}°`]);
   if (meta.slowmotion_rate != null && meta.slowmotion_rate > 1)
-    entries.push(["慢动作", `${meta.slowmotion_rate}×`]);
+    entries.push(["Slow motion", `${meta.slowmotion_rate}×`]);
   if (meta.gps_status != null && meta.gps_status > 0)
-    entries.push(["GPS", "已记录"]);
+    entries.push(["GPS", "Recorded"]);
   if (entries.length === 0) return null;
   return (
     <div className="mt-3 border-t pt-3">
       <p className="mb-2 text-xs font-medium uppercase tracking-wide">
-        相机原生参数
+        Native camera settings
       </p>
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {entries.map(([label, value]) => (
@@ -291,12 +291,11 @@ export function AlbumPage() {
           );
         } catch (cause) {
           throw new Error(
-            `「${item.name}」删除失败：${errorText(cause)}；已删除文件不会恢复，其余文件保持选中。`,
+            `“${item.name}” could not be deleted: ${errorText(cause)}; deleted files will not be restored. Remaining files stay selected.`,
           );
         }
         // File is deleted even when the index sync is deferred; deselect it.
-        if (result.warning)
-          warnings.push(`「${item.name}」：${result.warning}`);
+        if (result.warning) warnings.push(`“${item.name}”: ${result.warning}`);
         setSelected((previous) => {
           const next = new Map(previous);
           next.delete(item.path);
@@ -306,7 +305,7 @@ export function AlbumPage() {
       }
       if (warnings.length) {
         setError(
-          `文件已删除。相机原生服务占用媒体索引，可稍后在系统页“清理失效索引”同步：${warnings.join("；")}`,
+          `File deleted. Native camera services are using the media index. Sync it later with Clean stale index on the System page: ${warnings.join("; ")}`,
         );
       }
     } finally {
@@ -319,9 +318,14 @@ export function AlbumPage() {
       if (document.fullscreenElement) await document.exitFullscreen();
       else if (stage.current?.requestFullscreen)
         await stage.current.requestFullscreen();
-      else setPreviewError("此浏览器不支持全屏，可以使用图片缩放查看细节。");
+      else
+        setPreviewError(
+          "This browser does not support fullscreen. Zoom in to inspect image details.",
+        );
     } catch {
-      setPreviewError("浏览器未允许全屏，请使用图片缩放查看细节。");
+      setPreviewError(
+        "Fullscreen was not allowed by the browser. Zoom in to inspect image details.",
+      );
     }
   }
 
@@ -329,7 +333,7 @@ export function AlbumPage() {
   for (const item of items) {
     const date =
       sort === "newest" || sort === "oldest"
-        ? new Date(item.mtime * 1000).toLocaleDateString("zh-CN", {
+        ? new Date(item.mtime * 1000).toLocaleDateString("en-US", {
             year: "numeric",
             month: "long",
             day: "numeric",
@@ -346,8 +350,8 @@ export function AlbumPage() {
   return (
     <>
       <PageHeader
-        title="相册"
-        description="按日期查找照片和视频，预览或下载原文件。"
+        title="Album"
+        description="Find photos and videos by date, preview them, or download originals."
         actions={
           <Button
             variant="outline"
@@ -355,13 +359,13 @@ export function AlbumPage() {
             onClick={() => void refresh()}
           >
             <RefreshCw className={refreshing ? "animate-spin" : undefined} />
-            刷新
+            Refresh
           </Button>
         }
       />
       <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-[160px_220px_minmax(160px,1fr)_150px]">
         <div>
-          <Label htmlFor="album-storage">存储位置</Label>
+          <Label htmlFor="album-storage">Storage location</Label>
           <Select
             value={storageRoot(dir)}
             disabled={busy}
@@ -371,46 +375,46 @@ export function AlbumPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="/emulated">内部存储</SelectItem>
-              <SelectItem value="/sd">SD 卡</SelectItem>
+              <SelectItem value="/emulated">Internal storage</SelectItem>
+              <SelectItem value="/sd">SD card</SelectItem>
               <SelectItem value="/">Blackbox</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div>
-          <Label id="album-kind-label">媒体类型</Label>
+          <Label id="album-kind-label">Media type</Label>
           <Tabs
             value={filter}
             onValueChange={setFilter}
             aria-labelledby="album-kind-label"
           >
             <TabsList className="w-full">
-              <TabsTrigger value="all">全部</TabsTrigger>
-              <TabsTrigger value="image">照片</TabsTrigger>
-              <TabsTrigger value="video">视频</TabsTrigger>
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="image">Photos</TabsTrigger>
+              <TabsTrigger value="video">Video</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
         <div>
-          <Label htmlFor="album-search">文件名</Label>
+          <Label htmlFor="album-search">Filename</Label>
           <Input
             id="album-search"
-            placeholder="搜索媒体…"
+            placeholder="Search media…"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
         </div>
         <div>
-          <Label htmlFor="album-sort">排序</Label>
+          <Label htmlFor="album-sort">Sort</Label>
           <Select value={sort} onValueChange={setSort}>
             <SelectTrigger id="album-sort" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="newest">最近修改</SelectItem>
-              <SelectItem value="oldest">最早修改</SelectItem>
-              <SelectItem value="name">文件名称</SelectItem>
-              <SelectItem value="largest">文件大小</SelectItem>
+              <SelectItem value="newest">Recently modified</SelectItem>
+              <SelectItem value="oldest">Oldest modified</SelectItem>
+              <SelectItem value="name">Filename</SelectItem>
+              <SelectItem value="largest">File size</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -424,7 +428,7 @@ export function AlbumPage() {
             variant="ghost"
             onClick={() => changeDir(storageRoot(dir))}
           >
-            查看整个存储
+            View entire storage
           </Button>
         </div>
       )}
@@ -436,14 +440,15 @@ export function AlbumPage() {
       {listing?.truncated && (
         <div className="mb-4">
           <Notice tone="warning">
-            列表达到 100,000 项或目录深度限制。可从文件页进入具体文件夹浏览。
+            The list reached 100,000 items or the directory depth limit. Open a
+            specific folder on the Files page to browse further.
           </Notice>
         </div>
       )}
       {!!listing?.warnings.length && (
         <details className="mb-4 rounded-lg border p-3 text-sm">
           <summary className="cursor-pointer text-amber-700 dark:text-amber-300">
-            部分目录无法读取，列表可能不完整
+            Some directories could not be read. The list may be incomplete.
           </summary>
           <ul className="mt-2 break-all text-muted-foreground">
             {listing.warnings.map((warning) => (
@@ -455,12 +460,12 @@ export function AlbumPage() {
       {mediaIndex.data?.available && mediaIndex.data.stale > 0 && (
         <div className="mb-4">
           <Notice tone="warning">
-            发现 {mediaIndex.data.stale} 条失效媒体记录。
+            Found {mediaIndex.data.stale} stale media records.
             <a
               href="#/system?section=maintenance"
               className="ml-2 underline underline-offset-4"
             >
-              前往备份与清理
+              Go to backup and cleanup
             </a>
           </Notice>
         </div>
@@ -468,7 +473,7 @@ export function AlbumPage() {
       {selectedItems.length > 0 && (
         <div className="sticky top-16 z-10 mb-5 flex flex-wrap items-center gap-2 rounded-lg border bg-card/95 p-3 shadow-sm backdrop-blur">
           <Badge>
-            已选 {selectedItems.length} 项 ·{" "}
+            Selected {selectedItems.length} items ·{" "}
             {formatBytes(
               selectedItems.reduce((total, item) => total + item.size, 0),
             )}
@@ -479,7 +484,7 @@ export function AlbumPage() {
             disabled={busy}
             onClick={() => setSelected(new Map())}
           >
-            取消选择
+            Clear selection
           </Button>
           <Button
             size="sm"
@@ -487,7 +492,7 @@ export function AlbumPage() {
             onClick={() => download(selectedItems)}
           >
             <Download />
-            下载
+            Download
           </Button>
           {selectedItems.length === 1 && (
             <Button
@@ -501,22 +506,22 @@ export function AlbumPage() {
               }}
             >
               <Pencil />
-              重命名
+              Rename
             </Button>
           )}
           <ConfirmButton
-            title={`删除 ${selectedItems.length} 个文件？`}
-            description="永久删除所选媒体，不可撤销。遇到失败会停止，未删除文件保持选中。"
+            title={`Delete ${selectedItems.length} files?`}
+            description="Permanently deletes selected media. This cannot be undone. Stops on the first failure and keeps remaining files selected."
             variant="destructive"
             disabled={busy}
             onConfirm={() => remove(selectedItems)}
           >
             <Trash2 />
-            删除
+            Delete
           </ConfirmButton>
           {selectedItems.length > 1 && (
             <span className="w-full text-xs text-muted-foreground">
-              批量下载时，浏览器可能要求允许多个文件下载。
+              Your browser may ask permission to download multiple files.
             </span>
           )}
         </div>
@@ -525,22 +530,22 @@ export function AlbumPage() {
         <Spinner />
       ) : media.isError && !items.length ? (
         <Notice tone="error">
-          无法读取媒体：{media.error.message}
+          Cannot read media: {media.error.message}
           <Button
             variant="outline"
             className="mt-2"
             onClick={() => void refresh()}
           >
-            重新读取
+            Read again
           </Button>
         </Notice>
       ) : !items.length ? (
         <EmptyState
-          title="没有找到媒体"
+          title="No media found"
           description={
             search || filter !== "all"
-              ? "调整文件名或媒体类型筛选。"
-              : "此存储中尚无可浏览的照片或视频。"
+              ? "Adjust the filename or media type filter."
+              : "No photos or videos to browse in this storage yet."
           }
           action={
             search || filter !== "all" ? (
@@ -551,7 +556,7 @@ export function AlbumPage() {
                   setFilter("all");
                 }}
               >
-                清除筛选
+                Clear filters
               </Button>
             ) : undefined
           }
@@ -560,8 +565,8 @@ export function AlbumPage() {
         <>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
             <span>
-              已加载 {items.length} / {listing?.count ?? items.length} 个文件
-              {search !== querySearch ? " · 筛选中…" : ""}
+              Loaded {items.length} / {listing?.count ?? items.length} files
+              {search !== querySearch ? " · Filtering…" : ""}
             </span>
             <Button
               size="sm"
@@ -571,7 +576,7 @@ export function AlbumPage() {
                 setSelected(new Map(items.map((item) => [item.path, item])))
               }
             >
-              选择已加载项
+              Select loaded items
             </Button>
           </div>
           <div className="space-y-7">
@@ -581,7 +586,7 @@ export function AlbumPage() {
                   <h2 className="mb-3 text-sm font-medium">
                     {group.name}
                     <span className="ml-2 text-xs font-normal text-muted-foreground">
-                      修改日期
+                      Date modified
                     </span>
                   </h2>
                 )}
@@ -594,7 +599,7 @@ export function AlbumPage() {
                       <div className="relative aspect-[4/3] bg-secondary">
                         <button
                           className="h-full w-full overflow-hidden focus-visible:outline-2 focus-visible:outline-primary"
-                          aria-label={`预览 ${item.name}`}
+                          aria-label={`Preview ${item.name}`}
                           onClick={() => setPreview(item.path)}
                         >
                           <Thumbnail item={item} />
@@ -602,7 +607,7 @@ export function AlbumPage() {
                         <Checkbox
                           checked={selected.has(item.path)}
                           disabled={busy}
-                          aria-label={`${selected.has(item.path) ? "取消选择" : "选择"} ${item.name}`}
+                          aria-label={`${selected.has(item.path) ? "Clear selection" : "Select"} ${item.name}`}
                           className="absolute left-2 top-2 z-10 size-6 border-white/70 bg-black/30 text-white shadow-sm md:size-5"
                           onCheckedChange={() => toggle(item)}
                         />
@@ -634,7 +639,7 @@ export function AlbumPage() {
                   className="ml-2"
                   onClick={() => void refresh()}
                 >
-                  刷新列表
+                  Refresh list
                 </Button>
               </Notice>
             </div>
@@ -647,8 +652,8 @@ export function AlbumPage() {
                 onClick={() => void media.fetchNextPage()}
               >
                 {media.isFetchingNextPage
-                  ? "正在加载…"
-                  : `加载更多（剩余 ${(listing?.count ?? 0) - items.length} 项）`}
+                  ? "Loading…"
+                  : `Load more (${(listing?.count ?? 0) - items.length} remaining)`}
               </Button>
             </div>
           )}
@@ -659,7 +664,7 @@ export function AlbumPage() {
         onOpenChange={(open) => {
           if (!open) setPreview(null);
         }}
-        title={current?.name ?? "媒体预览"}
+        title={current?.name ?? "Media preview"}
         description={
           current
             ? `${formatBytes(current.size)} · ${formatDate(current.mtime)}`
@@ -719,7 +724,7 @@ export function AlbumPage() {
                   src={apiURL("video_stream", { file: current.path })}
                   onError={() =>
                     setPreviewError(
-                      "浏览器无法播放此视频，请下载原文件用支持相应编码的播放器打开。",
+                      "This browser cannot play the video. Download the original and open it in a player that supports its codec.",
                     )
                   }
                 />
@@ -738,7 +743,9 @@ export function AlbumPage() {
                   }
                   style={zoom === 1 ? undefined : { width: `${zoom * 100}%` }}
                   onError={() =>
-                    setPreviewError("图片无法预览，请下载原文件查看。")
+                    setPreviewError(
+                      "Cannot preview this image. Download the original to view it.",
+                    )
                   }
                 />
               )}
@@ -749,7 +756,7 @@ export function AlbumPage() {
                   onClick={() => void toggleFullscreen()}
                 >
                   <Minimize />
-                  退出全屏
+                  Exit fullscreen
                 </Button>
               )}
             </div>
@@ -763,7 +770,7 @@ export function AlbumPage() {
                 <Button
                   variant="outline"
                   size="icon"
-                  aria-label="上一项"
+                  aria-label="Previous item"
                   disabled={index <= 0}
                   onClick={() => step(-1)}
                 >
@@ -775,7 +782,7 @@ export function AlbumPage() {
                 <Button
                   variant="outline"
                   size="icon"
-                  aria-label="下一项"
+                  aria-label="Next item"
                   disabled={index < 0 || index >= items.length - 1}
                   onClick={() => step(1)}
                 >
@@ -788,7 +795,7 @@ export function AlbumPage() {
                     disabled={media.isFetching}
                     onClick={() => void media.fetchNextPage()}
                   >
-                    加载后续媒体
+                    Load more media
                   </Button>
                 )}
               </div>
@@ -798,7 +805,7 @@ export function AlbumPage() {
                     <Button
                       variant="outline"
                       size="icon"
-                      aria-label="缩小图片"
+                      aria-label="Zoom out"
                       disabled={zoom === 1}
                       onClick={() =>
                         setZoom((value) => Math.max(1, value - 0.5))
@@ -807,12 +814,12 @@ export function AlbumPage() {
                       <ZoomOut />
                     </Button>
                     <Button variant="ghost" onClick={() => setZoom(1)}>
-                      {zoom === 1 ? "适应窗口" : `${zoom * 100}%`}
+                      {zoom === 1 ? "Fit to window" : `${zoom * 100}%`}
                     </Button>
                     <Button
                       variant="outline"
                       size="icon"
-                      aria-label="放大图片"
+                      aria-label="Zoom in"
                       disabled={zoom >= 4}
                       onClick={() =>
                         setZoom((value) => Math.min(4, value + 0.5))
@@ -827,7 +834,7 @@ export function AlbumPage() {
                   onClick={() => void toggleFullscreen()}
                 >
                   <Maximize />
-                  全屏
+                  Fullscreen
                 </Button>
               </div>
             </div>
@@ -838,7 +845,7 @@ export function AlbumPage() {
                   download={current.name}
                 >
                   <Download />
-                  下载原文件
+                  Download original
                 </a>
               </Button>
               <Button asChild variant="outline">
@@ -849,7 +856,7 @@ export function AlbumPage() {
                   })}
                 >
                   <Folder />
-                  所在文件夹
+                  Containing folder
                 </a>
               </Button>
               <Button
@@ -862,20 +869,22 @@ export function AlbumPage() {
                 }}
               >
                 <Pencil />
-                重命名
+                Rename
               </Button>
               <ConfirmButton
-                title="删除此媒体？"
-                description={`将永久删除「${current.name}」，不可撤销。`}
+                title="Delete this media?"
+                description={`Permanently delete “${current.name}”. This cannot be undone.`}
                 disabled={busy}
                 onConfirm={() => remove([current])}
               >
                 <Trash2 />
-                删除
+                Delete
               </ConfirmButton>
             </div>
             <details className="mt-4 rounded-lg border p-3 text-sm">
-              <summary className="cursor-pointer font-medium">媒体信息</summary>
+              <summary className="cursor-pointer font-medium">
+                Media information
+              </summary>
               <div className="mt-3 break-all text-muted-foreground">
                 <p>{current.path}</p>
                 {info.isPending ? (
@@ -887,30 +896,30 @@ export function AlbumPage() {
                     <>
                       <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
                         <div>
-                          <dt>分辨率</dt>
+                          <dt>Resolution</dt>
                           <dd>
                             {info.data.width} × {info.data.height}
                           </dd>
                         </div>
                         <div>
-                          <dt>编码</dt>
+                          <dt>Codec</dt>
                           <dd>{info.data.codec}</dd>
                         </div>
                         {info.data.fps != null && (
                           <div>
-                            <dt>帧率</dt>
+                            <dt>Frame rate</dt>
                             <dd>{info.data.fps.toFixed(2)} fps</dd>
                           </div>
                         )}
                         {info.data.duration_sec != null && (
                           <div>
-                            <dt>时长</dt>
-                            <dd>{info.data.duration_sec.toFixed(1)} 秒</dd>
+                            <dt>Duration</dt>
+                            <dd>{info.data.duration_sec.toFixed(1)} sec</dd>
                           </div>
                         )}
                         {info.data.bitrate_bps != null && (
                           <div>
-                            <dt>码率</dt>
+                            <dt>Bitrate</dt>
                             <dd>
                               {(info.data.bitrate_bps / 1e6).toFixed(2)} Mbps
                             </dd>
@@ -933,8 +942,8 @@ export function AlbumPage() {
         onOpenChange={(open) => {
           if (!open && !busy) setRename(null);
         }}
-        title="重命名媒体"
-        description="请保留正确的文件扩展名。同名文件不会被覆盖。"
+        title="Rename media"
+        description="Keep the correct file extension. Existing files are never overwritten."
       >
         <form
           className="space-y-4"
@@ -960,7 +969,7 @@ export function AlbumPage() {
             }
           }}
         >
-          <Label htmlFor="media-name">名称</Label>
+          <Label htmlFor="media-name">Name</Label>
           <Input
             id="media-name"
             autoFocus
@@ -973,7 +982,7 @@ export function AlbumPage() {
           {error && <Notice tone="error">{error}</Notice>}
           <div className="flex justify-end">
             <Button type="submit" disabled={busy || !name}>
-              {busy ? "保存中…" : "保存"}
+              {busy ? "Saving…" : "Save"}
             </Button>
           </div>
         </form>

@@ -237,7 +237,7 @@ func (s *systemController) kill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.HasPrefix(current.Name, "dji_") || strings.HasPrefix(current.Name, "qmmf") || strings.HasPrefix(current.Name, "gui") {
-		if err = s.app.MarkRebootRequired("原生进程被终止", current.Name != "dji_network"); err != nil {
+		if err = s.app.MarkRebootRequired("Native process terminated", current.Name != "dji_network"); err != nil {
 			fileError(w, err)
 			return
 		}
@@ -333,7 +333,7 @@ func (s *systemController) command(w http.ResponseWriter, r *http.Request) {
 	}
 	result := map[string]any{"stdout": stdout.Text(), "stderr": stderr.Text(), "exit_code": exit, "cwd": p.CWD}
 	if ctx.Err() != nil {
-		result["stderr"] = stderr.Text() + "\n命令超时或请求取消，已终止进程组"
+		result["stderr"] = stderr.Text() + "\nCommand timed out or request cancelled; process group terminated"
 	}
 	jsonResponse(w, 200, result)
 }

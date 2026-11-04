@@ -186,9 +186,9 @@ func (s *fileStore) list(w http.ResponseWriter, r *http.Request) {
 	})
 	crumbs := []map[string]string{{"name": "Blackbox", "path": "/"}}
 	if dir == "/sd" || strings.HasPrefix(dir, "/sd/") {
-		crumbs = []map[string]string{{"name": "SD 卡", "path": "/sd"}}
+		crumbs = []map[string]string{{"name": "SD card", "path": "/sd"}}
 	} else if dir == "/emulated" || strings.HasPrefix(dir, "/emulated/") {
-		crumbs = []map[string]string{{"name": "内部存储", "path": "/emulated"}}
+		crumbs = []map[string]string{{"name": "Internal storage", "path": "/emulated"}}
 	}
 	prefix := crumbs[0]["path"]
 	rest := strings.TrimPrefix(path.Clean(dir), prefix)
@@ -403,7 +403,7 @@ func (s *fileStore) change(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			if indexed {
-				jsonError(w, 409, "indexed_media_rename", errors.New("AC004.db 中的媒体不能安全重命名；请使用相机原生界面"))
+				jsonError(w, 409, "indexed_media_rename", errors.New("Media indexed in AC004.db cannot be renamed safely; use the native camera interface"))
 				return
 			}
 		}

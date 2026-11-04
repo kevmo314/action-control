@@ -112,7 +112,7 @@ func stopNativeServices(a *App, takeoverNative bool) ([]string, error) {
 	if len(services) == 0 {
 		return nil, errors.New("no native camera services found; refusing an unverified takeover")
 	}
-	if err := a.MarkRebootRequired("原生相机服务已停止", true); err != nil {
+	if err := a.MarkRebootRequired("Native camera services stopped", true); err != nil {
 		return nil, err
 	}
 	args := append([]string{"stop"}, services...)
@@ -499,7 +499,7 @@ func (c *cameraController) start(w http.ResponseWriter, r *http.Request) {
 		if err := saveCameraPreset(c.app, cfg); err != nil {
 			c.mu.Lock()
 			if c.state == "running" {
-				c.lastError = "采集已启动，但成功参数未能保存：" + err.Error()
+				c.lastError = "Capture started, but successful settings could not be saved: " + err.Error()
 			}
 			c.mu.Unlock()
 		}

@@ -32,13 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Card,
-  EmptyState,
-  Notice,
-  PageHeader,
-  Spinner,
-} from "../ui";
+import { Card, EmptyState, Notice, PageHeader, Spinner } from "../ui";
 import { ConfirmButton, Modal } from "../dialogs";
 
 type NetworkRow = {
@@ -53,10 +47,10 @@ type NetworkRow = {
 };
 
 const stateNames: Record<string, string> = {
-  connected: "已连接",
-  disconnected: "未连接",
-  down: "无线已关闭",
-  unknown: "状态未知",
+  connected: "Connected",
+  disconnected: "Not connected",
+  down: "Wi-Fi is off",
+  unknown: "Unknown status",
 };
 
 export function NetworkPage() {
@@ -244,15 +238,17 @@ export function NetworkPage() {
     if (name === "wifi_connect" || name === "wifi_off") {
       setReconnect({
         mode: name === "wifi_connect" ? "client" : "off",
-        ssid: name === "wifi_connect" ? ssid : "关闭无线",
+        ssid: name === "wifi_connect" ? ssid : "Turn off Wi-Fi",
         address: "",
         previous: location.href,
-        time: new Date().toLocaleString("zh-CN"),
+        time: new Date().toLocaleString("en-US"),
       });
     }
     try {
       await post(name, { ...body, confirm: true });
-      setMessage("操作已受理。连接可能暂时中断；响应中断不代表操作失败。");
+      setMessage(
+        "Operation accepted. The connection may drop temporarily; an interrupted response does not mean the operation failed.",
+      );
       queryClient.removeQueries({ queryKey: ["wifi_scan"], exact: true });
       await refresh();
     } finally {
@@ -279,7 +275,7 @@ export function NetworkPage() {
       ssid: apSSID,
       address: hotspotAddress,
       previous: location.href,
-      time: new Date().toLocaleString("zh-CN"),
+      time: new Date().toLocaleString("en-US"),
     });
     try {
       const body: Record<string, unknown> = {
@@ -293,13 +289,13 @@ export function NetworkPage() {
       await post("hotspot_apply", body);
       setAPPassword("");
       setMessage(
-        "热点切换已受理。断线后请连接目标热点，再打开下面的访问地址。",
+        "Hotspot switch accepted. If disconnected, join the target hotspot and open the access URL below.",
       );
       queryClient.removeQueries({ queryKey: ["wifi_scan"], exact: true });
       await refresh();
     } catch (cause) {
       setError(
-        `切换未确认完成：${errorText(cause)}。请先查看连接与恢复状态，再决定是否重试。`,
+        `Switch not confirmed: ${errorText(cause)}. Check connection and recovery status before retrying.`,
       );
     } finally {
       setBusy(false);
@@ -311,41 +307,47 @@ export function NetworkPage() {
     setError("");
     setMessage("");
     try {
-      const result = await post<NativeHotspotResult>("native_hotspot", { action });
+      const result = await post<NativeHotspotResult>("native_hotspot", {
+        action,
+      });
       if (result.status !== "ok" || result.native_code !== 0) {
-        throw new Error(result.reason || `原生热点操作失败（${result.native_code ?? "未知"}）`);
+        throw new Error(
+          result.reason ||
+            `Native hotspot operation failed (${result.native_code ?? "Unknown"})`,
+        );
       }
-      setMessage(action === "start"
-        ? "原生热点已开启。连接相机热点后访问 http://192.168.2.1:8080。"
-        : "原生热点已关闭。无线已交还相机原生关闭状态。" );
+      setMessage(
+        action === "start"
+          ? "Native hotspot started. Connect to the camera hotspot and visit http://192.168.2.1:8080."
+          : "Native hotspot stopped. Wireless is back in the native disabled state.",
+      );
       await refresh();
     } catch (cause) {
-      setError(`原生热点操作失败：${errorText(cause)}`);
+      setError(`Native hotspot operation failed: ${errorText(cause)}`);
     } finally {
       setNativeHotspotBusy(false);
     }
   }
- 
 
   const mode = status.data?.mode;
   const role = status.data?.role ?? mode;
   const primaryState = !status.data
-    ? "未取得状态"
+    ? "No status received"
     : role === "hotspot"
-      ? "热点运行中"
+      ? "Hotspot running"
       : role === "closed"
-        ? "无线已关闭"
-        : (stateNames[status.data.state] ?? "状态未知");
+        ? "Wi-Fi is off"
+        : (stateNames[status.data.state] ?? "Unknown status");
   const operation = status.data?.operation;
 
   return (
     <>
       <PageHeader
-        title="网络"
+        title="Network"
         description={
           managed
-            ? "独立管理无线连接与热点。"
-            : "沿用相机原生网络访问控制台、相册和文件。"
+            ? "Manage wireless connections and hotspots independently."
+            : "Use native camera networking to access the console, album, and files."
         }
         actions={
           <Button
@@ -354,7 +356,7 @@ export function NetworkPage() {
             onClick={() => void refresh()}
           >
             <RefreshCw />
-            刷新
+            Refresh
           </Button>
         }
       />
@@ -363,7 +365,9 @@ export function NetworkPage() {
         {message && <Notice tone="success">{message}</Notice>}
         {config.error && <Notice tone="error">{config.error.message}</Notice>}
         {status.error && hardware && (
-          <Notice tone="error">无线状态不可用：{status.error.message}</Notice>
+          <Notice tone="error">
+            Wireless status unavailable: {status.error.message}
+          </Notice>
         )}
         {managed && operation?.status === "failed" && (
           <Notice
@@ -372,52 +376,53 @@ export function NetworkPage() {
             }
           >
             {operation.recovery_status === "restored"
-              ? `切换失败，已回退到${operation.recovery_ssid ? `「${operation.recovery_ssid}」` : operation.recovery_mode === "native" ? "原生网络" : operation.recovery_mode === "closed" ? "无线关闭状态" : "先前网络"}。`
-              : "上次网络操作失败。"}
+              ? `Switch failed; restored to ${operation.recovery_ssid ? `“${operation.recovery_ssid}”` : operation.recovery_mode === "native" ? "Native networking" : operation.recovery_mode === "closed" ? "Wireless disabled" : "Previous network"}.`
+              : "The last network operation failed."}
             {operation.recovery_status === "failed" &&
-              " 自动恢复也未完成，请通过 USB ADB 访问。"}
+              " Automatic recovery also failed. Use USB ADB to access the device."}
             <details className="mt-2">
-              <summary className="cursor-pointer">失败详情</summary>
+              <summary className="cursor-pointer">Failure details</summary>
               <p className="mt-2 break-all">{operation.error}</p>
             </details>
           </Notice>
         )}
         {managed && operating && (
           <Notice>
-            <Spinner /> 网络操作
+            <Spinner /> Network operation
             {operation?.recovery_status === "restoring"
-              ? "恢复先前连接中"
+              ? "Restoring previous connection"
               : operation?.status === "queued"
-                ? "排队中"
-                : "执行中"}
-            ，请勿重复提交。
+                ? "Queued"
+                : "Running"}
+            . Do not submit again.
           </Notice>
         )}
         {managed &&
           operation?.status === "succeeded" &&
           hiddenSuccess !== operation.id && (
-            <Notice tone="success">网络操作已完成。</Notice>
+            <Notice tone="success">Network operation completed.</Notice>
           )}
       </div>
 
       {managed && reconnect && (
-        <Card className="mb-5" title="切换后的访问方式">
+        <Card className="mb-5" title="Access after switching">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 space-y-2 text-sm">
               <p className="break-all">
-                目标：{reconnect.ssid}{" "}
+                Target: {reconnect.ssid}{" "}
                 <span className="text-xs text-muted-foreground">
                   · {reconnect.time}
                 </span>
               </p>
               {reconnect.mode === "off" ? (
                 <p className="text-muted-foreground">
-                  关闭无线后，请通过 USB ADB
-                  转发访问控制台并重新开启网络，或重启相机恢复原生网络。
+                  After turning off Wi-Fi, use USB ADB forwarding to access the
+                  console and re-enable networking, or reboot the camera to
+                  restore native networking.
                 </p>
               ) : reconnect.address ? (
                 <p>
-                  连接此热点后打开：
+                  After joining this hotspot, open:
                   <a
                     className="break-all font-medium underline underline-offset-4"
                     href={reconnect.address}
@@ -427,33 +432,37 @@ export function NetworkPage() {
                 </p>
               ) : (
                 <p className="text-muted-foreground">
-                  连接到同一 WiFi 后，可在路由器中查看相机的新 IP 地址；也可使用
-                  USB ADB 转发。
+                  After joining the same Wi-Fi network, find the new camera IP
+                  address in your router. You can also use USB ADB forwarding.
                 </p>
               )}
               {reconnect.mode !== "off" && (
                 <p className="text-muted-foreground">
-                  切换失败且先前配置可用时，设备会尝试恢复先前连接。恢复后可
+                  If switching fails and the previous configuration is
+                  available, the device will try to restore the previous
+                  connection. After recovery, you can
                   <a
                     className="mx-1 underline underline-offset-4"
                     href={reconnect.previous}
                   >
-                    重试原地址
+                    Retry original URL
                   </a>
-                  。
+                  .
                 </p>
               )}
               <details>
-                <summary className="cursor-pointer">使用 USB 恢复访问</summary>
-                <p className="mt-2">连接 USB 后在电脑运行：</p>
+                <summary className="cursor-pointer">
+                  Restore access over USB
+                </summary>
+                <p className="mt-2">Connect USB, then run on your computer:</p>
                 <pre className="mt-2 max-w-full overflow-x-auto rounded-md bg-muted p-3 text-xs">
-                  adb forward tcp:8080 tcp:{httpPort}
+                  adb forward tcp:8080 tcp: {httpPort}
                 </pre>
                 <a
                   className="mt-2 inline-block underline underline-offset-4"
                   href="http://127.0.0.1:8080/#/network"
                 >
-                  打开 USB 访问地址
+                  Open USB access URL
                 </a>
               </details>
             </div>
@@ -462,56 +471,57 @@ export function NetworkPage() {
               size="sm"
               onClick={() => setReconnect(null)}
             >
-              关闭提示
+              Dismiss
             </Button>
           </div>
         </Card>
       )}
 
-      <Card className="mb-5" title="当前网络">
+      <Card className="mb-5" title="Current network">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <Wifi className="size-7 shrink-0 text-primary" />
             <div className="min-w-0">
-
-            <p className="text-lg font-semibold">{primaryState}</p>
-            {(status.data?.owner === "native" || mode === "native") && (
-              <Badge className="mt-1" variant="secondary">
-                DJI 原生管理
-              </Badge>
-            )}
+              <p className="text-lg font-semibold">{primaryState}</p>
+              {(status.data?.owner === "native" || mode === "native") && (
+                <Badge className="mt-1" variant="secondary">
+                  DJI native management
+                </Badge>
+              )}
               <p className="break-all text-sm text-muted-foreground">
-                {status.data?.ssid || "未连接网络"}
+                {status.data?.ssid || "No network connection"}
               </p>
             </div>
           </div>
           <div className="text-right text-sm">
-            <p className="text-muted-foreground">IP 地址</p>
+            <p className="text-muted-foreground">IP address</p>
             <p className="select-all font-mono">{status.data?.ip || "—"}</p>
             {status.data?.ip && (
               <a
                 className="mt-1 inline-block text-xs underline underline-offset-4"
                 href={`http://${status.data.ip}:${httpPort}/#/network`}
               >
-                通过此地址访问
+                Access at this URL
               </a>
             )}
           </div>
         </div>
         {!managed && (
           <p className="mt-4 text-sm text-muted-foreground">
-            请使用相机本身的无线设置。手机或电脑连接相机原生热点后，可通过上方地址访问控制台；相机已有局域网连接时也可直接使用。
+            Use the wireless settings on the camera. Connect your phone or
+            computer to the native camera hotspot to access the console at the
+            address above. An existing LAN connection can also be used.
           </p>
         )}
         <details className="mt-5 border-t pt-4 text-sm">
-          <summary className="cursor-pointer font-medium">详细信息</summary>
+          <summary className="cursor-pointer font-medium">Details</summary>
           <dl className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
             <div>
-              <dt className="text-muted-foreground">底层状态</dt>
+              <dt className="text-muted-foreground">Underlying state</dt>
               <dd>{status.data?.state ?? "—"}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">信号</dt>
+              <dt className="text-muted-foreground">Signal</dt>
               <dd>
                 {status.data?.signal == null
                   ? "—"
@@ -519,7 +529,7 @@ export function NetworkPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">频率</dt>
+              <dt className="text-muted-foreground">Frequency</dt>
               <dd>
                 {status.data?.freq_mhz == null
                   ? "—"
@@ -527,7 +537,7 @@ export function NetworkPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">发送 / 接收</dt>
+              <dt className="text-muted-foreground">Sent / received</dt>
               <dd>
                 {status.data?.tx_bitrate_mbps ?? "—"} /{" "}
                 {status.data?.rx_bitrate_mbps ?? "—"} Mbps
@@ -538,38 +548,43 @@ export function NetworkPage() {
       </Card>
 
       {!managed && hardware && (
-        <Card className="mb-5" title="原生热点">
+        <Card className="mb-5" title="Native hotspot">
           <p className="text-sm text-muted-foreground">
-            由相机原生网络服务管理，不接管 wlan0。开启后手机连接相机热点，访问
-            <code className="mx-1 rounded bg-muted px-1">http://192.168.2.1:{httpPort}</code>。
-            当前 HTTP 接口没有登录认证或加密。
+            Managed by native camera networking without taking over wlan0. Once
+            enabled, connect your phone to the camera hotspot and visit
+            <code className="mx-1 rounded bg-muted px-1">
+              http://192.168.2.1:{httpPort}
+            </code>
+            . The HTTP interface has no login authentication or encryption.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <ConfirmButton
-              title="开启原生热点？"
-              description="相机会启动自己的 Wi-Fi 热点和 DHCP。当前页面可能因网络切换短暂中断；不要在不可信网络暴露未认证的控制台。"
+              title="Start native hotspot?"
+              description="The camera will start its own Wi-Fi hotspot and DHCP server. Network changes may briefly disconnect this page. Do not expose the unauthenticated console to untrusted networks."
               disabled={nativeHotspotBusy || status.data?.role === "hotspot"}
               onConfirm={() => void nativeHotspotAction("start")}
             >
-              <Wifi /> 开启原生热点
+              <Wifi /> Start native hotspot
             </ConfirmButton>
             <ConfirmButton
               variant="outline"
-              title="关闭原生热点？"
-              description="相机会关闭原生 Wi-Fi 热点。手机将断开连接；如需恢复访问，请使用 USB ADB 或重新开启热点。"
+              title="Stop native hotspot?"
+              description="The camera will turn off its native Wi-Fi hotspot. Your phone will disconnect. Use USB ADB or enable the hotspot again to restore access."
               disabled={nativeHotspotBusy || status.data?.role !== "hotspot"}
               onConfirm={() => void nativeHotspotAction("stop")}
             >
-              <WifiOff /> 关闭原生热点
+              <WifiOff /> Stop native hotspot
             </ConfirmButton>
           </div>
         </Card>
       )}
 
       <details className="mb-5 rounded-xl border bg-card px-6 py-5 shadow-sm">
-        <summary className="cursor-pointer font-semibold">高级网络管理</summary>
+        <summary className="cursor-pointer font-semibold">
+          Advanced network management
+        </summary>
         <div className="mt-4 max-w-2xl space-y-3">
-          <Label htmlFor="network-control">管理方式</Label>
+          <Label htmlFor="network-control">Management mode</Label>
           <Select
             value={config.data?.network_control ?? "native"}
             disabled={!config.data || busy || operating}
@@ -582,8 +597,8 @@ export function NetworkPage() {
                 await refresh();
                 setMessage(
                   value === "native"
-                    ? "已使用原生网络。"
-                    : "已启用独立管理，执行网络操作时生效。",
+                    ? "Using native networking."
+                    : "Independent management enabled. It takes effect when performing network operations.",
                 );
               } catch (cause) {
                 setError(errorText(cause));
@@ -596,21 +611,26 @@ export function NetworkPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="native">使用原生网络（推荐）</SelectItem>
-              <SelectItem value="managed">独立管理（高级）</SelectItem>
+              <SelectItem value="native">
+                Use native networking (recommended)
+              </SelectItem>
+              <SelectItem value="managed">
+                Independent management (advanced)
+              </SelectItem>
             </SelectContent>
           </Select>
           <p className="text-sm text-muted-foreground">
-            默认由相机管理无线连接。独立管理模式会在切换网络时接管无线，可能中断
-            DJI Mimo 连接。
+            The camera manages wireless connections by default. Independent
+            management takes over wireless networking when switching networks,
+            which may interrupt the DJI Mimo connection.
           </p>
           {managed && (
             <p className="text-sm text-muted-foreground">
-              返回原生模式前，请先到{" "}
+              Before returning to native mode, go to{" "}
               <a className="underline underline-offset-4" href="#/system">
-                系统页
+                System page
               </a>{" "}
-              交还原生网络，等待操作完成。
+              Restore the native network and wait for completion.
             </p>
           )}
         </div>
@@ -620,8 +640,8 @@ export function NetworkPage() {
         <>
           <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
             <Card
-              title="连接 WiFi"
-              description="选择已保存网络，或扫描附近网络。切换网络可能使当前页面断线。"
+              title="Connect Wi-Fi"
+              description="Choose a saved network or scan for nearby networks. Switching networks may disconnect this page."
             >
               <div className="mb-4 flex flex-wrap gap-2">
                 <Button
@@ -629,18 +649,18 @@ export function NetworkPage() {
                   onClick={() => void scan.refetch()}
                 >
                   <RefreshCw />
-                  {scan.isFetching ? "扫描中…" : "扫描附近网络"}
+                  {scan.isFetching ? "Scanning…" : "Scan nearby networks"}
                 </Button>
                 <Button
                   variant="outline"
                   disabled={!canChange || busy || operating}
                   onClick={() => showConnect()}
                 >
-                  连接其他网络
+                  Connect to another network
                 </Button>
               </div>
               {scan.error && (
-                <Notice tone="error">扫描失败：{scan.error.message}</Notice>
+                <Notice tone="error">Scan failed: {scan.error.message}</Notice>
               )}
               {known.isPending ? (
                 <Spinner />
@@ -648,8 +668,8 @@ export function NetworkPage() {
                 <Notice tone="error">{known.error.message}</Notice>
               ) : !networks.length ? (
                 <EmptyState
-                  title="尚无已保存网络"
-                  description="扫描附近网络，或手动输入网络名称。"
+                  title="No saved networks"
+                  description="Scan nearby networks or enter a network name manually."
                 />
               ) : (
                 <div className="divide-y">
@@ -663,26 +683,31 @@ export function NetworkPage() {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="break-all text-sm font-medium">
-                              {network.ssid || "隐藏网络"}
+                              {network.ssid || "Hidden network"}
                             </p>
-                            {network.connected && <Badge>当前连接</Badge>}
+                            {network.connected && (
+                              <Badge>Current connection</Badge>
+                            )}
                             {network.saved && (
-                              <Badge variant="secondary">已保存</Badge>
+                              <Badge variant="secondary">Saved</Badge>
                             )}
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">
                             {network.signal == null
-                              ? "信号未知"
+                              ? "Unknown signal"
                               : `${network.signal} dBm`}{" "}
-                            · {network.encrypted ? "需要密码" : "开放网络"}
+                            ·{" "}
+                            {network.encrypted
+                              ? "Password required"
+                              : "Open network"}
                           </p>
                           {(network.bssid || network.band) && (
                             <details className="mt-2 text-xs text-muted-foreground">
                               <summary className="cursor-pointer">
-                                网络详情
+                                Network details
                               </summary>
                               <p className="mt-1 font-mono">
-                                {network.bssid || "BSSID 未知"}
+                                {network.bssid || "Unknown BSSID"}
                                 {network.band ? ` · ${network.band}` : ""}
                               </p>
                             </details>
@@ -697,18 +722,18 @@ export function NetworkPage() {
                             disabled={!canChange || busy || operating}
                             onClick={() => showConnect(network)}
                           >
-                            连接
+                            Connect
                           </Button>
                         )}
                         {network.saved && (
                           <details className="relative">
                             <summary className="cursor-pointer list-none rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-accent">
-                              更多
+                              More
                             </summary>
                             <div className="absolute right-0 z-10 mt-1 rounded-md border bg-popover p-1 shadow-md">
                               <ConfirmButton
-                                title="忘记此网络？"
-                                description={`将删除「${network.ssid}」的保存凭据，不会主动断开当前连接。`}
+                                title="Forget this network?"
+                                description={`Delete “${network.ssid}”. This does not actively disconnect the current connection.`}
                                 disabled={!canChange || busy || operating}
                                 onConfirm={async () => {
                                   await post("known_forget", {
@@ -718,7 +743,7 @@ export function NetworkPage() {
                                   await refresh();
                                 }}
                               >
-                                <Trash2 /> 忘记
+                                <Trash2 /> Forget
                               </ConfirmButton>
                             </div>
                           </details>
@@ -730,7 +755,7 @@ export function NetworkPage() {
               )}
               <details className="mt-5 border-t pt-4">
                 <summary className="cursor-pointer text-sm font-medium">
-                  高级设置
+                  Advanced settings
                 </summary>
                 <label className="mt-4 flex items-start gap-3 text-sm">
                   <Checkbox
@@ -745,7 +770,9 @@ export function NetworkPage() {
                           enabled: checked === true,
                         });
                         await refresh();
-                        setMessage("自动连接设置已保存，下次整机启动时生效。");
+                        setMessage(
+                          "Auto-connect settings saved. They take effect on the next full boot.",
+                        );
                       } catch (cause) {
                         setError(errorText(cause));
                       } finally {
@@ -754,9 +781,11 @@ export function NetworkPage() {
                     }}
                   />
                   <span>
-                    启动时扫描并连接最近使用的已保存网络
+                    Scan and connect to the most recently used saved network on
+                    boot
                     <span className="mt-1 block text-xs text-muted-foreground">
-                      开启后在下次整机启动时接管无线并尝试连接。
+                      When enabled, takes over wireless networking and attempts
+                      to connect on the next full boot.
                     </span>
                   </span>
                 </label>
@@ -769,12 +798,12 @@ export function NetworkPage() {
             </Card>
 
             <Card
-              title="相机热点"
-              description="配置并开启供手机或电脑连接的相机热点，不提供互联网转发。"
+              title="Camera hotspot"
+              description="Set up a camera hotspot for a phone or computer. This does not share an internet connection."
             >
               {hotspot.error && (
                 <Notice tone="error">
-                  无法读取热点配置：{hotspot.error.message}
+                  Cannot read hotspot configuration: {hotspot.error.message}
                 </Notice>
               )}
               <form
@@ -785,7 +814,7 @@ export function NetworkPage() {
                 }}
               >
                 <div>
-                  <Label htmlFor="hotspot-ssid">热点名称</Label>
+                  <Label htmlFor="hotspot-ssid">Hotspot name</Label>
                   <Input
                     id="hotspot-ssid"
                     value={apSSID}
@@ -793,38 +822,38 @@ export function NetworkPage() {
                     onChange={(event) => setAPSSID(event.target.value)}
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
-                    1–32 个 UTF-8 字节。
+                    1–32 UTF-8 bytes.
                   </p>
                 </div>
                 {!apOpen && (
                   <div>
-                    <Label htmlFor="hotspot-password">新密码</Label>
+                    <Label htmlFor="hotspot-password">New password</Label>
                     <Input
                       id="hotspot-password"
                       type="password"
                       autoComplete="new-password"
                       placeholder={
                         hotspot.data?.has_password
-                          ? "留空则保留当前密码"
-                          : "请输入热点密码"
+                          ? "Leave blank to keep the current password"
+                          : "Enter the hotspot password"
                       }
                       value={apPassword}
                       required={!hotspot.data?.has_password}
                       onChange={(event) => setAPPassword(event.target.value)}
                     />
                     <p className="mt-1 text-xs text-muted-foreground">
-                      8–63 字节或 64 位十六进制 PSK。
+                      8–63 bytes or a 64-digit hexadecimal PSK.
                     </p>
                   </div>
                 )}
                 <details className="border-t pt-4">
                   <summary className="cursor-pointer text-sm font-medium">
-                    高级设置
+                    Advanced settings
                   </summary>
                   <div className="mt-4 space-y-4">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label htmlFor="hotspot-band">频段</Label>
+                        <Label htmlFor="hotspot-band">Band</Label>
                         <Select
                           value={band}
                           onValueChange={(value) => {
@@ -842,7 +871,7 @@ export function NetworkPage() {
                         </Select>
                       </div>
                       <div>
-                        <Label htmlFor="hotspot-channel">信道</Label>
+                        <Label htmlFor="hotspot-channel">Channel</Label>
                         <Select value={channel} onValueChange={setChannel}>
                           <SelectTrigger
                             id="hotspot-channel"
@@ -871,7 +900,8 @@ export function NetworkPage() {
                       </div>
                     </div>
                     <p className="text-xs leading-5 text-muted-foreground">
-                      实际可用信道受固件、区域和无线环境约束。
+                      Available channels depend on firmware, region, and
+                      wireless conditions.
                     </p>
                     <label className="flex items-center gap-3 text-sm">
                       <Checkbox
@@ -881,11 +911,12 @@ export function NetworkPage() {
                           setAPPassword("");
                         }}
                       />
-                      开放热点（不设密码）
+                      Open hotspot (no password)
                     </label>
                     {apOpen && (
                       <Notice tone="warning">
-                        开放热点没有 WiFi 加密，只应在可信环境使用。
+                        An open hotspot has no Wi-Fi encryption. Use only in
+                        trusted environments.
                       </Notice>
                     )}
                   </div>
@@ -899,11 +930,13 @@ export function NetworkPage() {
                       }
                     >
                       {mode === "hotspot" ? <Save /> : <Radio />}
-                      {mode === "hotspot" ? "保存并重启热点" : "保存并开启热点"}
+                      {mode === "hotspot"
+                        ? "Save and restart hotspot"
+                        : "Save and start hotspot"}
                     </Button>
                   )}
                   {mode === "hotspot" && !apDirty && (
-                    <Badge>热点正在运行</Badge>
+                    <Badge>Hotspot is running</Badge>
                   )}
                   {apDirty && hotspot.data && (
                     <Button
@@ -912,7 +945,7 @@ export function NetworkPage() {
                       disabled={busy}
                       onClick={() => loadHotspot(hotspot.data!)}
                     >
-                      放弃修改
+                      Discard changes
                     </Button>
                   )}
                 </div>
@@ -922,21 +955,21 @@ export function NetworkPage() {
 
           <details className="mt-5 rounded-xl border bg-card px-6 py-5 shadow-sm">
             <summary className="cursor-pointer font-semibold text-destructive">
-              危险操作
+              Dangerous operations
             </summary>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t pt-4">
               <p className="max-w-2xl text-sm text-muted-foreground">
-                关闭客户端与热点。之后只能通过 USB ADB
-                转发或整机重启恢复网页访问。
+                Turns off the client and hotspot. Afterwards, access requires
+                USB ADB forwarding or reboot the camera to restore web access.
               </p>
               <ConfirmButton
-                title="关闭无线网络？"
-                description="将断开 WiFi 和热点。之后需要 USB ADB 转发或整机重启才能恢复访问。"
+                title="Turn off wireless networking?"
+                description="Disconnects Wi-Fi and the hotspot. USB ADB forwarding or a full reboot is required to restore access."
                 disabled={!canChange || busy || operating}
                 variant="destructive"
                 onConfirm={() => queue("wifi_off")}
               >
-                <WifiOff /> 关闭无线网络
+                <WifiOff /> Turn off wireless networking
               </ConfirmButton>
             </div>
           </details>
@@ -945,8 +978,12 @@ export function NetworkPage() {
             onOpenChange={(value) => {
               if (!busy) setConfirmHotspot(value);
             }}
-            title={mode === "hotspot" ? "保存并重启热点？" : "保存并开启热点？"}
-            description={`将切换到热点「${apSSID}」。当前页面可能断线；失败时设备会尝试恢复先前连接与设置。`}
+            title={
+              mode === "hotspot"
+                ? "Save and restart hotspot?"
+                : "Save and start hotspot?"
+            }
+            description={`Switch to hotspot “${apSSID}”. This page may disconnect. On failure, the device will attempt to restore the previous connection and settings.`}
           >
             <div className="flex justify-end gap-2">
               <Button
@@ -954,7 +991,7 @@ export function NetworkPage() {
                 disabled={busy}
                 onClick={() => setConfirmHotspot(false)}
               >
-                取消
+                Cancel
               </Button>
               <Button
                 disabled={!canChange || busy || operating}
@@ -963,7 +1000,7 @@ export function NetworkPage() {
                   setConfirmHotspot(false);
                 }}
               >
-                {busy ? "正在提交…" : "确认切换"}
+                {busy ? "Submitting…" : "Confirm switch"}
               </Button>
             </div>
           </Modal>
@@ -976,8 +1013,8 @@ export function NetworkPage() {
                 if (!value) setPassword("");
               }
             }}
-            title={ssid ? `连接到「${ssid}」` : "连接其他网络"}
-            description="确认后将切换到客户端模式，当前浏览器可能断线；连接失败时会尝试恢复先前网络。"
+            title={ssid ? `Connect to “${ssid}”` : "Connect to another network"}
+            description="Switches to client mode. Your browser may disconnect. If the connection fails, the previous network will be restored where possible."
           >
             <form
               className="space-y-4"
@@ -992,19 +1029,20 @@ export function NetworkPage() {
                   setPassword("");
                 } catch (cause) {
                   setConnectError(
-                    `${errorText(cause)}。若连接中断，请等待状态刷新，不要立即重复提交。`,
+                    `${errorText(cause)}. If disconnected, wait for status to refresh before submitting again.`,
                   );
                 }
               }}
             >
               {reuse ? (
                 <Notice>
-                  将使用已保存的凭据连接。切换网络可能使当前页面断线。
+                  Uses saved credentials to connect. Switching networks may
+                  disconnect this page.
                 </Notice>
               ) : (
                 <>
                   <div>
-                    <Label htmlFor="wifi-ssid">网络名称</Label>
+                    <Label htmlFor="wifi-ssid">Network name</Label>
                     <Input
                       id="wifi-ssid"
                       autoFocus
@@ -1015,7 +1053,7 @@ export function NetworkPage() {
                   </div>
                   {!open && (
                     <div>
-                      <Label htmlFor="wifi-password">密码</Label>
+                      <Label htmlFor="wifi-password">Password</Label>
                       <Input
                         id="wifi-password"
                         type="password"
@@ -1025,7 +1063,7 @@ export function NetworkPage() {
                         required
                       />
                       <p className="mt-1 text-xs text-muted-foreground">
-                        8–63 字节或 64 位十六进制 PSK。
+                        8–63 bytes or a 64-digit hexadecimal PSK.
                       </p>
                     </div>
                   )}
@@ -1033,11 +1071,11 @@ export function NetworkPage() {
               )}
               <details className="border-t pt-4">
                 <summary className="cursor-pointer text-sm font-medium">
-                  高级设置
+                  Advanced settings
                 </summary>
                 <div className="mt-4 space-y-4">
                   <div>
-                    <Label htmlFor="wifi-bssid">指定 BSSID（可选）</Label>
+                    <Label htmlFor="wifi-bssid">Specify BSSID (optional)</Label>
                     <Input
                       id="wifi-bssid"
                       className="font-mono"
@@ -1052,7 +1090,7 @@ export function NetworkPage() {
                         checked={open}
                         onCheckedChange={(checked) => setOpen(checked === true)}
                       />
-                      开放网络（不使用密码）
+                      Open network (no password)
                     </label>
                   )}
                 </div>
@@ -1066,7 +1104,7 @@ export function NetworkPage() {
                     className="mt-2"
                     onClick={() => setConnect(false)}
                   >
-                    查看恢复方式
+                    View recovery options
                   </Button>
                 </Notice>
               )}
@@ -1075,7 +1113,7 @@ export function NetworkPage() {
                   type="submit"
                   disabled={!canChange || busy || operating}
                 >
-                  <KeyRound /> {busy ? "正在提交…" : "确认连接"}
+                  <KeyRound /> {busy ? "Submitting…" : "Confirm connection"}
                 </Button>
               </div>
             </form>

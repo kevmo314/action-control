@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownUp, FileUp, Play, RefreshCw, Search, Square } from "lucide-react";
+import {
+  ArrowDownUp,
+  FileUp,
+  Play,
+  RefreshCw,
+  Search,
+  Square,
+} from "lucide-react";
 import { errorText, invalidate, post, useAPI } from "../api";
 import type { ProcessInfo } from "../types";
 import { Button } from "@/components/ui/button";
@@ -101,8 +108,8 @@ export function ProcessPage() {
   return (
     <>
       <PageHeader
-        title="进程"
-        description="查看和管理设备进程。这里的操作具有 root 权限。"
+        title="Processes"
+        description="View and manage device processes. These operations run as root."
       />
       {error && (
         <div className="mb-4">
@@ -114,10 +121,12 @@ export function ProcessPage() {
           <Notice tone="success">{message}</Notice>
         </div>
       )}
-      <Card description="CPU 为两次采样之间的整机占比；未知值不按零显示。终止时校验 PID 的启动身份。">
+      <Card description="CPU is the share of total system usage between samples; unknown values are not shown as zero. Process start identity is checked before termination.">
         <div className="mb-4 flex flex-wrap items-end gap-3">
           <div className="min-w-40 flex-1">
-            <Label htmlFor="process-filter">筛选名称 / 命令 / PID / 用户</Label>
+            <Label htmlFor="process-filter">
+              Filter name / command / PID / user
+            </Label>
             <div className="relative">
               <Search className="absolute left-3 top-3 size-4 text-muted-foreground" />
               <Input
@@ -132,7 +141,7 @@ export function ProcessPage() {
             </div>
           </div>
           <div>
-            <Label htmlFor="process-sort">排序</Label>
+            <Label htmlFor="process-sort">Sort</Label>
             <Select
               value={sort}
               onValueChange={(value) => {
@@ -144,23 +153,23 @@ export function ProcessPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="rss">内存</SelectItem>
+                <SelectItem value="rss">Memory</SelectItem>
                 <SelectItem value="cpu">CPU</SelectItem>
                 <SelectItem value="pid">PID</SelectItem>
-                <SelectItem value="name">名称</SelectItem>
+                <SelectItem value="name">Name</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <Button
             variant="outline"
-            aria-label={descending ? "改为升序排列" : "改为降序排列"}
+            aria-label={descending ? "Sort ascending" : "Sort descending"}
             onClick={() => {
               setDescending((value) => !value);
               setPage(1);
             }}
           >
             <ArrowDownUp />
-            {descending ? "降序" : "升序"}
+            {descending ? "Descending" : "Ascending"}
           </Button>
           <Button
             variant="outline"
@@ -168,33 +177,35 @@ export function ProcessPage() {
             disabled={processes.isFetching}
           >
             <RefreshCw />
-            刷新
+            Refresh
           </Button>
           <Button
             disabled={!hardware || busy}
             onClick={() => setStartOpen(true)}
           >
             <Play />
-            启动进程
+            Start process
           </Button>
         </div>
         {processes.isPending ? (
           <Spinner />
         ) : processes.isError ? (
-          <Notice tone="warning">无法读取进程：{processes.error.message}</Notice>
+          <Notice tone="warning">
+            Cannot read processes: {processes.error.message}
+          </Notice>
         ) : visible.length === 0 ? (
-          <EmptyState title="没有匹配的进程" />
+          <EmptyState title="No matching processes" />
         ) : (
           <>
             <Table className="min-w-[620px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>PID</TableHead>
-                  <TableHead>进程 / 命令</TableHead>
-                  <TableHead>用户</TableHead>
+                  <TableHead>Process / command</TableHead>
+                  <TableHead>User</TableHead>
                   <TableHead>CPU</TableHead>
-                  <TableHead>内存</TableHead>
-                  <TableHead>操作</TableHead>
+                  <TableHead>Memory</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -232,7 +243,7 @@ export function ProcessPage() {
                         }
                         onClick={() => setSelected(process)}
                       >
-                        管理
+                        Manage
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -241,7 +252,8 @@ export function ProcessPage() {
             </Table>
             <div className="mt-4 flex items-center justify-between gap-3 text-sm">
               <span className="text-muted-foreground">
-                共 {visible.length} 个 · 第 {currentPage} / {pageCount} 页
+                Total {visible.length} items · Page {currentPage} / {pageCount}{" "}
+                page
               </span>
               <div className="flex gap-2">
                 <Button
@@ -249,14 +261,14 @@ export function ProcessPage() {
                   disabled={currentPage === 1}
                   onClick={() => setPage((value) => value - 1)}
                 >
-                  上一页
+                  Previous page
                 </Button>
                 <Button
                   variant="outline"
                   disabled={currentPage === pageCount}
                   onClick={() => setPage((value) => value + 1)}
                 >
-                  下一页
+                  Next page
                 </Button>
               </div>
             </div>
@@ -268,34 +280,34 @@ export function ProcessPage() {
         onOpenChange={(open) => {
           if (!open) setSelected(null);
         }}
-        title="管理进程"
-        description="请核对命令与启动身份。未知进程可能属于固件或其他应用。"
+        title="Manage processes"
+        description="Check the command and process start identity. Unknown processes may belong to firmware or other applications."
       >
         {selected && (
           <div className="space-y-4">
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-              <dt>PID / 父 PID</dt>
+              <dt>PID / parent PID</dt>
               <dd className="font-mono">
                 {selected.pid} / {selected.ppid}
               </dd>
-              <dt>名称</dt>
+              <dt>Name</dt>
               <dd>{selected.name}</dd>
-              <dt>命令</dt>
+              <dt>Command</dt>
               <dd className="break-all font-mono">{selected.cmd}</dd>
-              <dt>启动身份</dt>
+              <dt>Start identity</dt>
               <dd className="font-mono">{selected.start_time}</dd>
-              <dt>虚拟内存</dt>
+              <dt>Swap</dt>
               <dd>{formatBytes(selected.vsz_bytes)}</dd>
             </dl>
             <div className="flex flex-wrap gap-2">
               {[15, 9].map((signal) => (
                 <ConfirmButton
                   key={signal}
-                  title={`向 PID ${selected.pid} 发送 SIG${signal === 15 ? "TERM" : "KILL"}？`}
+                  title={`Send SIG${signal === 15 ? "TERM" : "KILL"} to PID ${selected.pid}?`}
                   description={
                     signal === 15
-                      ? "请求进程退出，可能中断正在进行的操作。"
-                      : "强制终止可能导致未保存数据丢失。只在明确需要时使用。"
+                      ? "Requests process exit. This may interrupt ongoing operations."
+                      : "Force killing may lose unsaved data. Use only when necessary."
                   }
                   disabled={busy}
                   variant={signal === 9 ? "destructive" : "outline"}
@@ -308,13 +320,13 @@ export function ProcessPage() {
                         signal,
                         confirm: true,
                       },
-                      "信号已发送，请刷新进程状态。",
+                      "Signal sent. Refresh the process list to check its status.",
                     );
                     setSelected(null);
                   }}
                 >
                   <Square />
-                  {signal === 15 ? "请求退出" : "强制终止"}
+                  {signal === 15 ? "Request exit" : "Force kill"}
                 </ConfirmButton>
               ))}
             </div>
@@ -324,12 +336,12 @@ export function ProcessPage() {
       <Modal
         open={startOpen}
         onOpenChange={setStartOpen}
-        title="启动受管进程"
-        description="命令在 Action Control 主服务进程组中运行；面板退出时会停止。不要在这里启动要跨面板重启存活的无线服务。"
+        title="Start managed process"
+        description="Commands run in the Action Control service process group and stop when the console exits. Do not start wireless services here if they need to survive a console restart."
       >
         <div className="space-y-4">
           <div>
-            <Label htmlFor="start-cwd">工作目录</Label>
+            <Label htmlFor="start-cwd">Working directory</Label>
             <Input
               id="start-cwd"
               value={startCwd}
@@ -338,7 +350,7 @@ export function ProcessPage() {
             />
           </div>
           <div>
-            <Label htmlFor="start-command">后台命令</Label>
+            <Label htmlFor="start-command">Background command</Label>
             <Input
               id="start-command"
               value={startCommand}
@@ -347,20 +359,20 @@ export function ProcessPage() {
             />
           </div>
           <ConfirmButton
-            title="以 root 启动此命令？"
+            title="Run this command as root?"
             description={startCommand}
             disabled={busy || !startCommand.trim() || !startCwd.startsWith("/")}
             onConfirm={async () => {
               await perform(
                 "process_start",
                 { cmd: startCommand, cwd: startCwd, confirm: true },
-                "后台进程已启动，请通过进程列表查看状态。",
+                "Background process started. Check its status in the process list.",
               );
               setStartOpen(false);
             }}
           >
             <FileUp />
-            启动
+            Start
           </ConfirmButton>
         </div>
       </Modal>

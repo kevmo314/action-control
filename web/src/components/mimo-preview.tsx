@@ -10,7 +10,7 @@ export function MimoPreview({ enabled }: { enabled: boolean }) {
   const video = useRef<HTMLVideoElement>(null);
   const [connected, setConnected] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [playback, setPlayback] = useState("未连接");
+  const [playback, setPlayback] = useState("Not connected");
   const [error, setError] = useState("");
   const [size, setSize] = useState("");
   const status = useAPI<MimoPreviewStatus>(
@@ -23,7 +23,7 @@ export function MimoPreview({ enabled }: { enabled: boolean }) {
     if (!connected) return;
     if (!enabled) {
       setConnected(false);
-      setPlayback("原生服务未就绪");
+      setPlayback("Native services not ready");
       return;
     }
     const controller = new AbortController();
@@ -43,10 +43,10 @@ export function MimoPreview({ enabled }: { enabled: boolean }) {
       if (controller.signal.aborted) return;
       destroy();
       setError(message);
-      setPlayback("预览已断开");
+      setPlayback("Preview disconnected");
       setConnected(false);
     };
-    setPlayback("等待 Mimo 画面…");
+    setPlayback("Waiting for Mimo video…");
     setError("");
     setSize("");
     void import("mpegts.js")
@@ -54,7 +54,7 @@ export function MimoPreview({ enabled }: { enabled: boolean }) {
         if (controller.signal.aborted || !element) return;
         if (!mpegts.getFeatureList().mseLivePlayback) {
           throw new Error(
-            "此浏览器不支持实时视频播放，请使用支持 MediaSource 的浏览器。",
+            "This browser does not support live video playback. Use a browser with MediaSource support.",
           );
         }
         player = mpegts.createPlayer(
@@ -75,7 +75,7 @@ export function MimoPreview({ enabled }: { enabled: boolean }) {
         );
         player.on(mpegts.Events.ERROR, (kind: string, detail: string) => {
           fail(
-            `无法继续接收画面（${kind}: ${detail}）。请让 Mimo 停留在实时预览页，然后重新连接。`,
+            `Unable to receive more video (${kind}: ${detail}). Keep Mimo on its live preview page, then reconnect.`,
           );
         });
         player.attachMediaElement(element);
@@ -84,9 +84,9 @@ export function MimoPreview({ enabled }: { enabled: boolean }) {
           await player.play();
         } catch (error) {
           if (!controller.signal.aborted) {
-            setPlayback("等待手动播放");
+            setPlayback("Waiting for manual playback");
             setError(
-              `浏览器未自动播放：${errorText(error)}。可点击视频中的播放按钮。`,
+              `Browser autoplay did not start: ${errorText(error)}. You can click the play button in the video.`,
             );
           }
         }
@@ -96,10 +96,12 @@ export function MimoPreview({ enabled }: { enabled: boolean }) {
   }, [connected, attempt, enabled]);
 
   return (
-    <Card title="Mimo 预览转发">
+    <Card title="Mimo preview relay">
       <p className="mb-4 text-sm leading-6 text-muted-foreground">
-        在手机上用 Mimo 连接相机并保持实时预览，即可在这里同步观看无声画面。
-        手机切回浏览器后，Mimo 可能暂停视频；建议在另一台设备上打开此页。
+        Connect your phone to the camera in Mimo and keep live preview open to
+        view the same video here without audio. Mimo may pause video when you
+        switch back to the browser on your phone. Open this page on another
+        device for best results.
       </p>
       <div className="relative aspect-video overflow-hidden rounded-lg bg-black">
         <video
@@ -110,15 +112,15 @@ export function MimoPreview({ enabled }: { enabled: boolean }) {
           className="h-full w-full object-contain"
           onPlaying={() => {
             if (connected) {
-              setPlayback("正在播放");
+              setPlayback("Playing");
               setError("");
             }
           }}
           onWaiting={() => {
-            if (connected) setPlayback("等待画面…");
+            if (connected) setPlayback("Waiting for video…");
           }}
           onPause={() => {
-            if (connected) setPlayback("播放已暂停");
+            if (connected) setPlayback("Playback paused");
           }}
           onLoadedMetadata={(event) => {
             const element = event.currentTarget;
@@ -129,8 +131,8 @@ export function MimoPreview({ enabled }: { enabled: boolean }) {
         {!connected && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-5 text-center text-sm text-white/70">
             {enabled
-              ? "连接 Mimo 预览后，画面将在这里显示"
-              : "相机原生服务就绪后可连接预览"}
+              ? "Connect to Mimo preview to show video here"
+              : "Connect preview once native camera services are ready"}
           </div>
         )}
       </div>
@@ -143,20 +145,20 @@ export function MimoPreview({ enabled }: { enabled: boolean }) {
           }}
         >
           <Play />
-          {connected ? "重新连接" : "连接预览"}
+          {connected ? "Reconnect" : "Connect preview"}
         </Button>
         <Button
           variant="outline"
           disabled={!connected}
           onClick={() => {
             setConnected(false);
-            setPlayback("已断开");
+            setPlayback("Disconnected");
             setError("");
             setSize("");
           }}
         >
           <Square />
-          断开预览
+          Disconnect preview
         </Button>
         <Button
           variant="ghost"
@@ -168,14 +170,14 @@ export function MimoPreview({ enabled }: { enabled: boolean }) {
           }
         >
           <Maximize />
-          全屏
+          Fullscreen
         </Button>
       </div>
       <p aria-live="polite" className="mt-3 text-sm text-muted-foreground">
         {playback}
         {connected && size ? ` · ${size}` : ""}
         {connected && status.data?.state === "streaming"
-          ? ` · ${status.data.clients} 个网页连接`
+          ? ` · ${status.data.clients} web clients`
           : ""}
       </p>
       {error && (
@@ -184,8 +186,8 @@ export function MimoPreview({ enabled }: { enabled: boolean }) {
         </div>
       )}
       <p className="mt-3 text-xs leading-5 text-muted-foreground">
-        断开预览或离开本页会释放本网页的转发连接。独立于 Mimo
-        的原生网页预览仍在调查中。
+        Disconnecting or leaving this page releases the relay for this browser.
+        Native web preview without Mimo is still under investigation.
       </p>
     </Card>
   );

@@ -53,7 +53,7 @@ async function pump() {
     while ((task = snapshot.tasks.find((item) => item.status === "queued"))) {
       const { id, dir, file, size } = task;
       if (!file) {
-        update(id, { status: "failed", error: "请重新选择文件。" });
+        update(id, { status: "failed", error: "Select the file again." });
         continue;
       }
       const controller = new AbortController();
@@ -87,7 +87,7 @@ async function pump() {
               : "failed",
           error:
             error instanceof APIError && error.status === 409
-              ? "目标目录已有同名文件。请检查已有文件，或更改文件名后重新上传。"
+              ? "A file with that name already exists. Check it, or rename the file before uploading again."
               : errorText(error),
         });
       } finally {
@@ -129,7 +129,10 @@ export function enqueueUploads(files: File[], dir: string) {
 export function cancelUpload(id: number) {
   if (current?.id === id) current.controller.abort();
   else
-    update(id, { status: "cancelled", error: "已从等待队列取消，尚未上传。" });
+    update(id, {
+      status: "cancelled",
+      error: "Cancelled before upload started.",
+    });
 }
 
 export function retryUpload(id: number) {
