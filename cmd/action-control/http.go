@@ -38,9 +38,10 @@ func sameOrigin(r *http.Request) bool {
 	return u.Scheme == scheme && u.Host == r.Host && u.User == nil && u.Path == "" && u.RawQuery == "" && u.Fragment == ""
 }
 func apiDispatch(mux *http.ServeMux, w http.ResponseWriter, r *http.Request) {
-	handler, pattern := mux.Handler(r)
+	_, pattern := mux.Handler(r)
 	if pattern != "" {
-		handler.ServeHTTP(w, r)
+		// ServeHTTP populates wildcard PathValues; Handler alone does not.
+		mux.ServeHTTP(w, r)
 		return
 	}
 	allowed := []string{}

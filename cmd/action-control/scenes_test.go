@@ -158,3 +158,13 @@ func TestStudioPreviewDoesNotLeakIntoDisabledStream(t *testing.T) {
 		t.Fatal("disabling burn-in cleared Studio preview")
 	}
 }
+
+func TestAPIDispatchPreservesSourcePathValue(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/scene/source/{id}", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(r.PathValue("id"))) })
+	w := httptest.NewRecorder()
+	apiDispatch(mux, w, httptest.NewRequest("GET", "/api/scene/source/clock", nil))
+	if w.Code != 200 || w.Body.String() != "clock" {
+		t.Fatalf("source ID lost during dispatch: %d %q", w.Code, w.Body.String())
+	}
+}
