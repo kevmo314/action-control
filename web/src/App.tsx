@@ -9,6 +9,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import {
   Camera,
+  Layers,
   Folder,
   Images,
   LayoutDashboard,
@@ -38,6 +39,9 @@ const LivestreamPage = lazy(() =>
   import("./pages/LivestreamPage").then((page) => ({
     default: page.LivestreamPage,
   })),
+);
+const StudioPage = lazy(() =>
+  import("./pages/StudioPage").then((page) => ({ default: page.StudioPage })),
 );
 const FilesPage = lazy(() =>
   import("./pages/FilesPage").then((page) => ({ default: page.FilesPage })),
@@ -69,6 +73,7 @@ const navigation = [
     icon: Radio,
     page: LivestreamPage,
   },
+  { id: "studio", name: "Studio", icon: Layers, page: StudioPage },
   { id: "album", name: "Album", icon: Images, page: AlbumPage },
   { id: "files", name: "Files", icon: Folder, page: FilesPage },
   { id: "network", name: "Network", icon: Wifi, page: NetworkPage },

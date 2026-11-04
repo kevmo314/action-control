@@ -11,15 +11,18 @@ import (
 )
 
 type Config struct {
-	Address     string `json:"address"`
-	StreamID    string `json:"stream_id"`
-	Passphrase  string `json:"passphrase,omitempty"`
-	LatencyMS   int    `json:"latency_ms"`
-	Width       int    `json:"width"`
-	Height      int    `json:"height"`
-	FPS         int    `json:"fps"`
-	BitrateKbps int    `json:"bitrate_kbps"`
-	AudioSource string `json:"audio_source"`
+	Address      string `json:"address"`
+	StreamID     string `json:"stream_id"`
+	Passphrase   string `json:"passphrase,omitempty"`
+	LatencyMS    int    `json:"latency_ms"`
+	Width        int    `json:"width"`
+	Height       int    `json:"height"`
+	FPS          int    `json:"fps"`
+	BitrateKbps  int    `json:"bitrate_kbps"`
+	AudioSource  string `json:"audio_source"`
+	ImageMode    string `json:"image_mode,omitempty"`
+	WindFilter   bool   `json:"wind_filter"`
+	OverlayFrame string `json:"overlay_frame,omitempty"`
 }
 
 func DefaultConfig() Config {
@@ -27,6 +30,20 @@ func DefaultConfig() Config {
 }
 
 func (c Config) Validate() error {
+	switch c.ImageMode {
+	case "", "standard", "10bit", "dlogm", "shdr", "lowlight":
+	default:
+		return errors.New("unsupported image mode")
+	}
+	if c.OverlayFrame != "" && (strings.ContainsAny(c.OverlayFrame, "\"\\\r\n\x00") || !strings.HasPrefix(c.OverlayFrame, "/")) {
+		return errors.New("overlay frame must be an absolute local path")
+	}
+	if c.OverlayFrame != "" && (c.ImageMode == "10bit" || c.ImageMode == "dlogm") {
+		return errors.New("browser overlays currently require an 8-bit image mode; disable the scene or select Standard")
+	}
+	if c.ImageMode != "" && c.ImageMode != "standard" && (c.Width != 1920 || c.Height != 1080 || c.FPS != 30) {
+		return errors.New("advanced image modes currently require 1920×1080 at 30 fps")
+	}
 	if !ValidSourceName(c.AudioSource) {
 		return errors.New("invalid microphone source name")
 	}
@@ -56,17 +73,41 @@ func (c Config) Validate() error {
 	return nil
 }
 
-// Pipeline only interpolates validated integers, never URLs or credentials.
+// Pipeline interpolates validated settings and a quoted local renderer path.
+// Network URLs and credentials stay outside the native pipeline.
 // Raw frames remain in the native pipeline; Go reads the encoded TS packets.
 func (c Config) Pipeline(testPattern bool) string {
 	source := "djiqmmfsrc camera=0"
 	if testPattern {
 		source = "videotestsrc is-live=true pattern=ball"
 	}
-	video := fmt.Sprintf("%s ! video/x-raw,format=NV12,width=%d,height=%d,framerate=%d/1 ! djicamc2venc control-rate=constant target-bitrate=%d idr-interval=%d b-frames=0 ! video/x-h265,stream-format=byte-stream,alignment=au ! h265parse config-interval=-1 ! queue max-size-buffers=16 ! mux. ", source, c.Width, c.Height, c.FPS, c.BitrateKbps*1000, c.FPS)
+	format, colorimetry := "NV12", ""
+	switch c.ImageMode {
+	case "10bit":
+		format, colorimetry = "P010_10LE", ",colorimetry=bt709"
+	case "dlogm":
+		format, colorimetry = "P010_10LE", ",colorimetry=bt709-dlogm"
+	case "lowlight":
+		if !testPattern {
+			source += " op-mode=lowlight viull-enable=true"
+		}
+	case "shdr":
+		if !testPattern {
+			source += " shdr=true shdr-enable=true"
+		}
+	}
+	overlay := ""
+	if c.OverlayFrame != "" {
+		overlay = fmt.Sprintf("gdkpixbufoverlay name=sceneoverlay location=\"%s\" overlay-width=%d overlay-height=%d ! ", c.OverlayFrame, c.Width, c.Height)
+	}
+	video := fmt.Sprintf("%s ! video/x-raw,format=%s,width=%d,height=%d,framerate=%d/1%s ! %sdjicamc2venc control-rate=constant target-bitrate=%d idr-interval=%d b-frames=0 ! video/x-h265,stream-format=byte-stream,alignment=au ! h265parse config-interval=-1 ! queue max-size-buffers=16 ! mux. ", source, format, c.Width, c.Height, c.FPS, colorimetry, overlay, c.BitrateKbps*1000, c.FPS)
 	audio := ""
 	if c.AudioSource != "" && c.AudioSource != "none" && c.AudioSource != "auto" {
-		audio = fmt.Sprintf("pulsesrc name=mic device=%s provide-clock=false client-name=osmo-stream ! queue max-size-buffers=16 ! audioconvert ! audioresample ! audio/x-raw,format=F32LE,rate=48000,channels=2 ! avenc_aac bitrate=128000 ! aacparse ! queue max-size-buffers=16 ! mux. ", c.AudioSource)
+		filter := ""
+		if c.WindFilter {
+			filter = "audiocheblimit mode=high-pass cutoff=180 poles=4 ripple=0.25 ! "
+		}
+		audio = fmt.Sprintf("pulsesrc name=mic device=%s provide-clock=false client-name=osmo-stream ! queue max-size-buffers=16 ! audioconvert ! audioresample ! audio/x-raw,format=F32LE,rate=48000,channels=2 ! %savenc_aac bitrate=128000 ! aacparse ! queue max-size-buffers=16 ! mux. ", c.AudioSource, filter)
 	}
 	return video + audio + "mpegtsmux name=mux alignment=7 ! appsink name=encoded sync=false max-buffers=8 drop=false wait-on-eos=false"
 }

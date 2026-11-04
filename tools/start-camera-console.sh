@@ -5,6 +5,9 @@ base=/blackbox/upgrade/osmo-srt/console
 runtime_dir=/tmp/osmo-srt-console
 umask 077
 mkdir -p "$runtime_dir/root"
+if [ -x /blackbox/upgrade/osmo-srt/browser/start.sh ]; then
+    nohup /blackbox/upgrade/osmo-srt/browser/start.sh </dev/null >/tmp/osmo-browser.log 2>&1 &
+fi
 if [ -r "$runtime_dir/console.pid" ]; then
     read -r console_pid < "$runtime_dir/console.pid"
     case "$console_pid" in

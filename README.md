@@ -20,6 +20,12 @@ Internal audio has been tested. DJI wireless PCM capture and dual-transmitter
 channel mapping still require a connected transmitter test. Internal capture
 currently bypasses DJI's APU wind-noise/AGC processing.
 
+The **Studio** page adds editable browser URL / HTML overlays, rendered on the
+camera and burned into outgoing SRT. Livestreaming also offers 10-bit Rec. 709,
+experimental D-Log M / sensor HDR / low-light modes, and a wind-rumble filter.
+See [Studio setup, verified limits, and processing research](docs/STUDIO.md).
+RockSteady / Horizon correction and DJI neural wind removal are not integrated.
+
 Build the English interface and the two executables:
 
 ```sh

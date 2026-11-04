@@ -687,6 +687,7 @@ func RegisterCamera(mux *http.ServeMux, a *App) (func() error, error) {
 		jsonResponse(w, 200, map[string]any{"ok": true, "services": services, "reboot_required": true})
 	})
 	return func() error {
+		defer livestream.scene.close()
 		if err := livestream.stop(); err != nil {
 			return err
 		}

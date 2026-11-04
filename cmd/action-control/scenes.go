@@ -1,0 +1,315 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
+	"math"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"regexp"
+	"runtime"
+	"sync"
+	"time"
+
+	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/emulation"
+	"github.com/chromedp/chromedp"
+)
+
+// Scene coordinates use a fixed 1280x720 canvas, scaled to the stream resolution.
+type sceneSource struct {
+	ID      string  `json:"id"`
+	Name    string  `json:"name"`
+	Kind    string  `json:"kind"`
+	URL     string  `json:"url"`
+	HTML    string  `json:"html"`
+	X       int     `json:"x"`
+	Y       int     `json:"y"`
+	Width   int     `json:"width"`
+	Height  int     `json:"height"`
+	Opacity float64 `json:"opacity"`
+	Visible bool    `json:"visible"`
+}
+type sceneLayout struct {
+	Revision uint64        `json:"revision"`
+	Enabled  bool          `json:"enabled"`
+	Sources  []sceneSource `json:"sources"`
+}
+type sceneRenderStatus struct {
+	Revision  uint64    `json:"revision"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Error     string    `json:"error,omitempty"`
+	FPS       float64   `json:"fps"`
+}
+type sceneController struct {
+	mu     sync.Mutex
+	layout sceneLayout
+	status sceneRenderStatus
+	dir    string
+	frame  string
+	ctx    context.Context
+	cancel context.CancelFunc
+	wake   chan struct{}
+	done   chan struct{}
+}
+
+var sourceID = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
+
+func validateScene(s sceneLayout) error {
+	if len(s.Sources) > 4 {
+		return errors.New("a scene supports up to four browser sources")
+	}
+	seen := map[string]bool{}
+	area := 0
+	for _, v := range s.Sources {
+		if !sourceID.MatchString(v.ID) || seen[v.ID] {
+			return errors.New("source IDs must be unique letters, digits, hyphens or underscores")
+		}
+		seen[v.ID] = true
+		if len(v.Name) > 100 || v.Width < 32 || v.Height < 24 || v.Width > 1280 || v.Height > 720 || v.X < 0 || v.Y < 0 || v.X+v.Width > 1280 || v.Y+v.Height > 720 || math.IsNaN(v.Opacity) || math.IsInf(v.Opacity, 0) || v.Opacity < 0 || v.Opacity > 1 {
+			return errors.New("source bounds or opacity are invalid")
+		}
+		area += v.Width * v.Height
+		switch v.Kind {
+		case "url":
+			u, e := url.Parse(v.URL)
+			if e != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || len(v.URL) > 2048 {
+				return errors.New("browser source URL must use HTTP or HTTPS")
+			}
+		case "html":
+			if len(v.HTML) > 12000 {
+				return errors.New("custom HTML is limited to 12000 bytes per source")
+			}
+		default:
+			return errors.New("source kind must be url or html")
+		}
+	}
+	if area > 1280*720*2 {
+		return errors.New("combined browser source area exceeds two full canvases")
+	}
+	return nil
+}
+func registerScenes(mux *http.ServeMux, a *App) *sceneController {
+	dir := filepath.Join(a.Dir, "studio")
+	if runtime.GOARCH == "arm64" {
+		if exe, e := os.Executable(); e == nil && filepath.Dir(exe) == "/blackbox/upgrade/osmo-srt/console" {
+			dir = filepath.Join(filepath.Dir(exe), "studio")
+		}
+	}
+	ctx, cancel := context.WithCancel(a.Ctx)
+	s := &sceneController{dir: dir, frame: filepath.Join(a.RunDir, "scene.png"), ctx: ctx, cancel: cancel, wake: make(chan struct{}, 1), done: make(chan struct{}), layout: sceneLayout{Sources: []sceneSource{}}}
+	if b, e := os.ReadFile(filepath.Join(dir, "scene.json")); e == nil {
+		var v sceneLayout
+		if json.Unmarshal(b, &v) == nil && validateScene(v) == nil {
+			s.layout = v
+		}
+	}
+	mux.HandleFunc("GET /api/scene", func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		jsonResponse(w, 200, map[string]any{"layout": s.layout, "renderer": s.status, "width": 1280, "height": 720, "target_fps": 2})
+	})
+	mux.HandleFunc("POST /api/scene", func(w http.ResponseWriter, r *http.Request) {
+		var v sceneLayout
+		if !readJSON(w, r, &v) {
+			return
+		}
+		if err := validateScene(v); err != nil {
+			jsonError(w, 400, "invalid_scene", err)
+			return
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if v.Revision != s.layout.Revision {
+			jsonError(w, 409, "scene_conflict", errors.New("scene changed; reload before saving"))
+			return
+		}
+		v.Revision++
+		if v.Sources == nil {
+			v.Sources = []sceneSource{}
+		}
+		b, _ := json.MarshalIndent(v, "", "  ")
+		if err := os.MkdirAll(s.dir, 0700); err != nil {
+			jsonError(w, 500, "scene_save", err)
+			return
+		}
+		if err := atomicWrite(filepath.Join(s.dir, "scene.json"), b, 0600); err != nil {
+			jsonError(w, 500, "scene_save", err)
+			return
+		}
+		s.layout = v
+		select {
+		case s.wake <- struct{}{}:
+		default:
+		}
+		jsonResponse(w, 200, map[string]any{"layout": v})
+	})
+	mux.HandleFunc("GET /api/scene/frame.png", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		http.ServeFile(w, r, s.frame)
+	})
+	go s.renderLoop()
+	return s
+}
+func (s *sceneController) close() { s.cancel(); <-s.done }
+
+// A fresh, matching revision is required before taking the camera away from DJI.
+func (s *sceneController) prepare() (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.layout.Enabled {
+		return "", nil
+	}
+	if s.status.Revision != s.layout.Revision || s.status.UpdatedAt.IsZero() || time.Since(s.status.UpdatedAt) > 10*time.Second || s.status.Error != "" {
+		return "", errors.New("scene renderer is not ready; check Studio before starting")
+	}
+	return s.frame, nil
+}
+
+type browserSource struct {
+	source sceneSource
+	ctx    context.Context
+	cancel context.CancelFunc
+}
+
+func (s *sceneController) renderLoop() {
+	defer close(s.done)
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+	var allocator context.Context
+	var stopAllocator context.CancelFunc
+	tabs := map[string]*browserSource{}
+	cleanup := func() {
+		for _, t := range tabs {
+			t.cancel()
+		}
+		tabs = map[string]*browserSource{}
+		if stopAllocator != nil {
+			stopAllocator()
+			stopAllocator = nil
+			allocator = nil
+		}
+	}
+	defer cleanup()
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-s.wake:
+		case <-ticker.C:
+		}
+		s.mu.Lock()
+		layout := s.layout
+		s.mu.Unlock()
+		started := time.Now()
+		canvas := image.NewNRGBA(image.Rect(0, 0, 1280, 720))
+		var renderErr error
+		if !layout.Enabled {
+			cleanup()
+		} else {
+			needed := map[string]bool{}
+			for _, v := range layout.Sources {
+				if !v.Visible || v.Opacity == 0 {
+					continue
+				}
+				needed[v.ID] = true
+				if allocator == nil {
+					endpoint := os.Getenv("OSMO_BROWSER_URL")
+					if endpoint == "" {
+						endpoint = "http://127.0.0.1:9222"
+					}
+					allocator, stopAllocator = chromedp.NewRemoteAllocator(s.ctx, endpoint)
+				}
+				t := tabs[v.ID]
+				if t != nil && (t.source.Kind != v.Kind || t.source.URL != v.URL || t.source.HTML != v.HTML || t.source.Width != v.Width || t.source.Height != v.Height) {
+					t.cancel()
+					delete(tabs, v.ID)
+					t = nil
+				}
+				if t == nil {
+					tc, cancel := chromedp.NewContext(allocator)
+					t = &browserSource{source: v, ctx: tc, cancel: cancel}
+					tabs[v.ID] = t
+					target := v.URL
+					if v.Kind == "html" {
+						target = "data:text/html;charset=utf-8;base64," + base64.StdEncoding.EncodeToString([]byte(v.HTML))
+					}
+					// Allocate using the page lifetime, so cancelling a navigation timeout
+					// cannot close the page or its browser connection after a successful load.
+					timer := time.AfterFunc(10*time.Second, cancel)
+					firstErr := chromedp.Run(tc)
+					timer.Stop()
+					if firstErr != nil {
+						t.cancel()
+						delete(tabs, v.ID)
+						renderErr = firstErr
+						break
+					}
+					initCtx, stop := context.WithTimeout(tc, 10*time.Second)
+					err := chromedp.Run(initCtx, chromedp.EmulateViewport(int64(v.Width), int64(v.Height)), chromedp.ActionFunc(func(ctx context.Context) error {
+						return emulation.SetDefaultBackgroundColorOverride().WithColor(&cdp.RGBA{R: 0, G: 0, B: 0, A: 0}).Do(ctx)
+					}), chromedp.Navigate(target))
+					stop()
+					if err != nil {
+						t.cancel()
+						delete(tabs, v.ID)
+						renderErr = fmt.Errorf("%s: %w", v.Name, err)
+						break
+					}
+				}
+				var data []byte
+				shotCtx, stop := context.WithTimeout(t.ctx, 3*time.Second)
+				err := chromedp.Run(shotCtx, chromedp.CaptureScreenshot(&data))
+				stop()
+				if err != nil {
+					t.cancel()
+					delete(tabs, v.ID)
+					renderErr = fmt.Errorf("%s: %w", v.Name, err)
+					break
+				}
+				im, err := png.Decode(bytes.NewReader(data))
+				if err != nil {
+					renderErr = err
+					break
+				}
+				draw.DrawMask(canvas, image.Rect(v.X, v.Y, v.X+v.Width, v.Y+v.Height), im, im.Bounds().Min, image.NewUniform(color.Alpha{A: uint8(math.Round(v.Opacity * 255))}), image.Point{}, draw.Over)
+			}
+			for id, t := range tabs {
+				if !needed[id] {
+					t.cancel()
+					delete(tabs, id)
+				}
+			}
+		}
+		var out bytes.Buffer
+		if renderErr == nil {
+			encoder := png.Encoder{CompressionLevel: png.BestSpeed}
+			renderErr = encoder.Encode(&out, canvas)
+		}
+		s.mu.Lock()
+		if layout.Revision == s.layout.Revision {
+			if renderErr == nil {
+				renderErr = atomicWrite(s.frame, out.Bytes(), 0600)
+			}
+			s.status.Error = ""
+			if renderErr != nil {
+				s.status.Error = renderErr.Error()
+			} else {
+				s.status.Revision = layout.Revision
+				s.status.UpdatedAt = time.Now().UTC()
+				s.status.FPS = math.Min(2, 1/time.Since(started).Seconds())
+			}
+		}
+		s.mu.Unlock()
+	}
+}

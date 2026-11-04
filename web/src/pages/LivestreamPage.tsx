@@ -25,6 +25,8 @@ type StreamConfig = {
   fps: number;
   bitrate_kbps: number;
   audio_source: string;
+  image_mode?: string;
+  wind_filter?: boolean;
 };
 type AudioSource = {
   name: string;
@@ -376,6 +378,69 @@ export function LivestreamPage() {
                       }
                     />
                   </div>
+                </div>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="stream-image-mode">Image mode</Label>
+                    <Select
+                      value={draft.image_mode || "standard"}
+                      disabled={disabled}
+                      onValueChange={(image_mode) => update({ image_mode })}
+                    >
+                      <SelectTrigger id="stream-image-mode" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="standard">
+                          Standard · 8-bit
+                        </SelectItem>
+                        <SelectItem value="10bit">10-bit · Rec. 709</SelectItem>
+                        <SelectItem value="dlogm">
+                          D-Log M · experimental
+                        </SelectItem>
+                        <SelectItem value="shdr">
+                          Sensor HDR · experimental
+                        </SelectItem>
+                        <SelectItem value="lowlight">
+                          Low light · experimental
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Advanced modes require 1080p30. 10-bit / D-Log M require
+                      Main 10 support and browser overlays disabled.
+                      Experimental processing is still being verified.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="stream-wind">Wind rumble filter</Label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        id="stream-wind"
+                        type="checkbox"
+                        disabled={disabled || draft.audio_source === "none"}
+                        checked={draft.wind_filter ?? false}
+                        onChange={(e) =>
+                          update({ wind_filter: e.target.checked })
+                        }
+                      />
+                      Reduce low-frequency wind rumble
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      180 Hz high-pass filter on the selected mic. This is
+                      separate from DJI’s neural wind reduction. Wireless mic
+                      pairing and gain remain unchanged.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 rounded-lg border p-3 text-xs text-muted-foreground">
+                  RockSteady and Horizon correction are unavailable in the
+                  custom capture path until DJI’s stabilization setup is
+                  verified. Manage browser overlays in{" "}
+                  <a className="underline" href="#/studio">
+                    Studio
+                  </a>
+                  .
                 </div>
                 <div className="mt-5">
                   <Notice>

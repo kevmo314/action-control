@@ -33,6 +33,7 @@ type livestreamRun struct {
 }
 type livestreamController struct {
 	camera *cameraController
+	scene  *sceneController
 	mu     sync.Mutex
 	run    *livestreamRun
 	last   livestreamStatus
@@ -96,6 +97,13 @@ func (s *livestreamController) snapshot() any {
 }
 
 func (s *livestreamController) start(config streamconfig.Config) error {
+	// Only our renderer may supply a file path, never an HTTP client.
+	config.OverlayFrame = ""
+	frame, sceneErr := s.scene.prepare()
+	if sceneErr != nil {
+		return sceneErr
+	}
+	config.OverlayFrame = frame
 	if err := config.Validate(); err != nil {
 		return err
 	}
@@ -284,6 +292,7 @@ func (s *livestreamController) stop() error {
 
 func registerLivestream(mux *http.ServeMux, c *cameraController) *livestreamController {
 	s := &livestreamController{camera: c, config: streamconfig.DefaultConfig(), last: livestreamStatus{State: "stopped", Codec: "H.265 / HEVC"}}
+	s.scene = registerScenes(mux, c.app)
 	mux.HandleFunc("GET /api/livestream", func(w http.ResponseWriter, r *http.Request) { jsonResponse(w, 200, s.snapshot()) })
 	mux.HandleFunc("GET /api/livestream/audio", func(w http.ResponseWriter, r *http.Request) {
 		a, err := s.device()

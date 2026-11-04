@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"runtime"
 	"sync"
 	"time"
@@ -18,26 +19,27 @@ import (
 // Opaque GStreamer handles avoid depending on private vendor struct layouts.
 // Functions are from the stable GStreamer 1.x C ABI.
 type gstAPI struct {
-	init         func(uintptr, uintptr, *uintptr) int32
-	parse        func(string, *uintptr) uintptr
-	getByName    func(uintptr, string) uintptr
-	setState     func(uintptr, int32) int32
-	unref        func(uintptr)
-	sampleUnref  func(uintptr)
-	pull         func(uintptr, uint64) uintptr
-	isEOS        func(uintptr) int32
-	getBuffer    func(uintptr) uintptr
-	getSize      func(uintptr) uintptr
-	extract      func(uintptr, uintptr, unsafe.Pointer, uintptr) uintptr
-	getBus       func(uintptr) uintptr
-	pop          func(uintptr, uint64, uint32) uintptr
-	parseError   func(uintptr, *uintptr, *uintptr)
-	messageUnref func(uintptr)
-	errorFree    func(uintptr)
-	free         func(uintptr)
-	getProperty  func(uintptr, string, *uintptr, uintptr)
-	newEOS       func() uintptr
-	sendEvent    func(uintptr, uintptr) int32
+	init              func(uintptr, uintptr, *uintptr) int32
+	parse             func(string, *uintptr) uintptr
+	getByName         func(uintptr, string) uintptr
+	setState          func(uintptr, int32) int32
+	unref             func(uintptr)
+	sampleUnref       func(uintptr)
+	pull              func(uintptr, uint64) uintptr
+	isEOS             func(uintptr) int32
+	getBuffer         func(uintptr) uintptr
+	getSize           func(uintptr) uintptr
+	extract           func(uintptr, uintptr, unsafe.Pointer, uintptr) uintptr
+	getBus            func(uintptr) uintptr
+	pop               func(uintptr, uint64, uint32) uintptr
+	parseError        func(uintptr, *uintptr, *uintptr)
+	messageUnref      func(uintptr)
+	errorFree         func(uintptr)
+	free              func(uintptr)
+	getProperty       func(uintptr, string, *uintptr, uintptr)
+	setStringProperty func(uintptr, string, string, uintptr)
+	newEOS            func() uintptr
+	sendEvent         func(uintptr, uintptr) int32
 }
 
 var gst gstAPI
@@ -77,6 +79,7 @@ func initGST() error {
 			{&gst.pop, core, "gst_bus_timed_pop_filtered"}, {&gst.parseError, core, "gst_message_parse_error"},
 			{&gst.messageUnref, core, "gst_message_unref"}, {&gst.errorFree, glib, "g_error_free"}, {&gst.free, glib, "g_free"},
 			{&gst.getProperty, libs["libgobject-2.0.so.0"], "g_object_get"},
+			{&gst.setStringProperty, libs["libgobject-2.0.so.0"], "g_object_set"},
 			{&gst.newEOS, core, "gst_event_new_eos"}, {&gst.sendEvent, core, "gst_element_send_event"},
 		} {
 			purego.RegisterLibFunc(symbol.target, symbol.lib, symbol.name)
@@ -119,6 +122,10 @@ func cString(p uintptr) string {
 
 type Capture struct {
 	pipeline, sink, bus, mic uintptr
+	overlay                  uintptr
+	overlayFrame             string
+	overlayModified          time.Time
+	lastOverlayCheck         time.Time
 	audioSource              string
 	lastAudioCheck           time.Time
 	ending                   bool
@@ -142,6 +149,14 @@ func Open(c Config, testPattern bool) (*Capture, error) {
 	s := &Capture{pipeline: pipeline}
 	s.sink = gst.getByName(pipeline, "encoded")
 	s.bus = gst.getBus(pipeline)
+	if c.OverlayFrame != "" {
+		s.overlay = gst.getByName(pipeline, "sceneoverlay")
+		s.overlayFrame = c.OverlayFrame
+		if s.overlay == 0 {
+			s.Close()
+			return nil, errors.New("scene overlay element unavailable")
+		}
+	}
 	if c.AudioSource != "none" && c.AudioSource != "" {
 		s.mic = gst.getByName(pipeline, "mic")
 		s.audioSource = c.AudioSource
@@ -181,6 +196,17 @@ func (s *Capture) Read(ctx context.Context) ([]byte, error) {
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil, err
+		}
+		if s.overlay != 0 && !s.ending && time.Since(s.lastOverlayCheck) > 250*time.Millisecond {
+			s.lastOverlayCheck = time.Now()
+			info, err := os.Stat(s.overlayFrame)
+			if err != nil || time.Since(info.ModTime()) > 15*time.Second {
+				return nil, errors.New("scene renderer stopped updating; stopping stream")
+			}
+			if !info.ModTime().Equal(s.overlayModified) {
+				gst.setStringProperty(s.overlay, "location", s.overlayFrame, 0)
+				s.overlayModified = info.ModTime()
+			}
 		}
 		if err := s.nativeError(); err != nil {
 			return nil, err
@@ -226,13 +252,14 @@ func (s *Capture) Close() {
 	if s.pipeline != 0 {
 		gst.setState(s.pipeline, 1)
 	} // GST_STATE_NULL
-	for _, h := range []uintptr{s.mic, s.sink, s.bus, s.pipeline} {
+	for _, h := range []uintptr{s.overlay, s.mic, s.sink, s.bus, s.pipeline} {
 		if h != 0 {
 			gst.unref(h)
 		}
 	}
 	s.sink, s.bus, s.pipeline = 0, 0, 0
 	s.mic = 0
+	s.overlay = 0
 }
 
 // End flushes the encoders and muxer before the transport is closed.

@@ -79,3 +79,32 @@ Source #19
 		t.Fatal("video-only mode requires a microphone")
 	}
 }
+
+func TestAdvancedModeHandoffConstraints(t *testing.T) {
+	c := DefaultConfig()
+	c.Address = "receiver:9000"
+	c.Width = 1920
+	c.Height = 1080
+	c.ImageMode = "10bit"
+	if err := c.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	c.OverlayFrame = "/tmp/scene.png"
+	if c.Validate() == nil {
+		t.Fatal("known P010 overlay stall configuration accepted")
+	}
+	c.OverlayFrame = ""
+	c.Width = 2560
+	c.Height = 1440
+	if c.Validate() == nil {
+		t.Fatal("untested advanced resolution accepted")
+	}
+	c.ImageMode = "standard"
+	if err := c.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	c.ImageMode = "guessed-vendor-mode"
+	if c.Validate() == nil {
+		t.Fatal("unknown processing mode accepted")
+	}
+}
