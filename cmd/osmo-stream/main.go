@@ -224,6 +224,9 @@ func run() (err error) {
 						time.Sleep(20 * time.Millisecond)
 					}
 				}
+				if !errors.Is(e, io.EOF) {
+					return fmt.Errorf("encoder drain did not finish: %w", e)
+				}
 				return nil
 			}
 			if ctx.Err() != nil {

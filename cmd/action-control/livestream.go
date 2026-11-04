@@ -256,7 +256,7 @@ func (s *livestreamController) send(ctx context.Context, run *livestreamRun, con
 		}
 		return syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
 	}
-	cmd.WaitDelay = 5 * time.Second
+	cmd.WaitDelay = 15 * time.Second
 	logs := &boundedBuffer{limit: 65536}
 	cmd.Stdout = logs
 	cmd.Stderr = logs

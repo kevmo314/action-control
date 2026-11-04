@@ -19,6 +19,10 @@ import (
 // Opaque GStreamer handles avoid depending on private vendor struct layouts.
 // Functions are from the stable GStreamer 1.x C ABI.
 type gstAPI struct {
+	ref               func(uintptr) uintptr
+	malloc0           func(uintptr) uintptr
+	setPadActive      func(uintptr, int32) int32
+	bufferFlags       func(uintptr) uint32
 	probeEvent        func(uintptr) uintptr
 	eventUnref        func(uintptr)
 	newAllocate       func(uintptr, uintptr, uintptr) uintptr
@@ -80,6 +84,8 @@ func initGST() error {
 			lib    uintptr
 			name   string
 		}{
+			{&gst.ref, core, "gst_object_ref"}, {&gst.malloc0, glib, "g_malloc0"},
+			{&gst.setPadActive, core, "gst_pad_set_active"}, {&gst.bufferFlags, core, "gst_buffer_get_flags"},
 			{&gst.init, core, "gst_init_check"}, {&gst.parse, core, "gst_parse_launch"},
 			{&gst.getByName, core, "gst_bin_get_by_name"}, {&gst.setState, core, "gst_element_set_state"},
 			{&gst.unref, core, "gst_object_unref"}, {&gst.sampleUnref, core, "gst_sample_unref"},
@@ -133,6 +139,7 @@ func cString(p uintptr) string {
 }
 
 type Capture struct {
+	steady                   *stabilization
 	preview                  uintptr
 	previewFile              string
 	lastPreviewCheck         time.Time
@@ -148,6 +155,20 @@ type Capture struct {
 }
 
 func Open(c Config, testPattern bool) (*Capture, error) {
+	if testPattern && c.Stabilized() {
+		return nil, errors.New("stabilization requires the live camera source")
+	}
+	if err := c.Validate(); err != nil {
+		return nil, err
+	}
+	if c.Stabilized() && !testPattern {
+		if err := checkStabilizationFirmware(); err != nil {
+			return nil, err
+		}
+		if os.Getenv("XDG_RUNTIME_DIR") == "" {
+			_ = os.Setenv("XDG_RUNTIME_DIR", "/run/user/root")
+		}
+	}
 	if err := initGST(); err != nil {
 		return nil, err
 	}
@@ -210,6 +231,12 @@ func Open(c Config, testPattern bool) (*Capture, error) {
 			return nil, err
 		}
 	}
+	if c.Stabilized() && !testPattern {
+		if err := s.prepareStabilization(c); err != nil {
+			s.Close()
+			return nil, err
+		}
+	}
 	if gst.setState(pipeline, 4) == 0 {
 		err := s.nativeError()
 		s.Close()
@@ -240,7 +267,18 @@ func (s *Capture) nativeError() error {
 func (s *Capture) Read(ctx context.Context) ([]byte, error) {
 	for {
 		if err := ctx.Err(); err != nil {
+			if s.steady != nil {
+				g := &s.steady.gate
+				fmt.Fprintf(os.Stderr, "stabilization state: sensor=%t configured=%t frames=%d keyframes=%d gate=%t video_end=%d audio_end=%d audio_eos=%t\n", g.seen.Load(), s.steady.applied, g.encoded.Load(), g.keyframes.Load(), g.opened.Load(), g.videoEnd.Load(), g.audioEnd.Load(), g.audioEOS.Load())
+			}
 			return nil, err
+		}
+		if s.steady != nil {
+			if s.ending {
+				s.steady.drain()
+			} else {
+				s.steady.update()
+			}
 		}
 		if s.overlay != 0 && !s.ending && time.Since(s.lastOverlayCheck) > 250*time.Millisecond {
 			s.lastOverlayCheck = time.Now()
@@ -306,6 +344,10 @@ func (s *Capture) Close() {
 	if s.pipeline != 0 {
 		gst.setState(s.pipeline, 1)
 	} // GST_STATE_NULL
+	if s.steady != nil {
+		s.steady.close()
+		s.steady = nil
+	}
 	if s.wind != nil {
 		s.wind.close()
 		s.wind = nil
@@ -322,7 +364,25 @@ func (s *Capture) Close() {
 }
 
 // End flushes the encoders and muxer before the transport is closed.
-func (s *Capture) End() { s.ending = true; gst.sendEvent(s.pipeline, gst.newEOS()) }
+func (s *Capture) End() {
+	if s.ending {
+		return
+	}
+	s.ending = true
+	if s.steady != nil {
+		// End both active branches without flushing captured video buffers.
+		// Inactive main/proxy pads must not participate in mux EOS handling.
+		if s.mic != 0 {
+			gst.sendEvent(s.mic, gst.newEOS())
+		}
+		if s.mic == 0 {
+			s.steady.gate.audioEOS.Store(true)
+		}
+		s.steady.drain()
+		return
+	}
+	gst.sendEvent(s.pipeline, gst.newEOS())
+}
 
 func (s *Capture) AudioStats() ProcessorStats {
 	if s.wind == nil {

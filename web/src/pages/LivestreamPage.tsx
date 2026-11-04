@@ -26,6 +26,7 @@ type StreamConfig = {
   bitrate_kbps: number;
   audio_source: string;
   image_mode?: string;
+  stabilization?: string;
   wind_filter?: boolean;
   noise_reduction?: string;
 };
@@ -94,6 +95,13 @@ export function LivestreamPage() {
       setDraft({ ...stream.data.config, passphrase: "" });
   }, [stream.data, draft]);
   const active = stream.data?.running ?? false;
+  const stabilized = !!draft?.stabilization && draft.stabilization !== "off";
+  const stabilizationLabels: Record<string, string> = {
+    off: "Off",
+    rocksteady: "RockSteady",
+    horizonsteady: "HorizonSteady",
+    horizonbalancing: "HorizonBalancing",
+  };
   const disabled = busy || active;
   const update = (change: Partial<StreamConfig>) =>
     setDraft((c) => (c ? { ...c, ...change } : c));
@@ -191,6 +199,13 @@ export function LivestreamPage() {
                 <dd className="mt-1">
                   {stream.data.config.width} × {stream.data.config.height} ·{" "}
                   {stream.data.config.fps} fps
+                  <span className="block text-sm text-muted-foreground">
+                    {
+                      stabilizationLabels[
+                        stream.data.config.stabilization || "off"
+                      ]
+                    }
+                  </span>
                 </dd>
               </div>
             </dl>
@@ -366,7 +381,9 @@ export function LivestreamPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="25">25 fps</SelectItem>
+                        <SelectItem value="25" disabled={stabilized}>
+                          25 fps
+                        </SelectItem>
                         <SelectItem value="30">30 fps</SelectItem>
                       </SelectContent>
                     </Select>
@@ -389,6 +406,46 @@ export function LivestreamPage() {
                 </div>
                 <div className="mt-5 grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
+                    <Label htmlFor="stream-stabilization">Stabilization</Label>
+                    <Select
+                      value={draft.stabilization || "off"}
+                      disabled={disabled}
+                      onValueChange={(stabilization) =>
+                        update(
+                          stabilization === "off"
+                            ? { stabilization }
+                            : {
+                                stabilization,
+                                fps: 30,
+                                image_mode: "standard",
+                              },
+                        )
+                      }
+                    >
+                      <SelectTrigger
+                        id="stream-stabilization"
+                        className="w-full"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="off">Off</SelectItem>
+                        <SelectItem value="rocksteady">RockSteady</SelectItem>
+                        <SelectItem value="horizonsteady">
+                          HorizonSteady
+                        </SelectItem>
+                        <SelectItem value="horizonbalancing">
+                          HorizonBalancing
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      DJI stabilization supports Standard 8-bit at 30 fps.
+                      Horizon modes use a narrower, corrected field of view.
+                      Starting waits briefly for stabilization to settle.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="stream-image-mode">Image mode</Label>
                     <Select
                       value={draft.image_mode || "standard"}
@@ -402,14 +459,16 @@ export function LivestreamPage() {
                         <SelectItem value="standard">
                           Standard · 8-bit
                         </SelectItem>
-                        <SelectItem value="10bit">10-bit · Rec. 709</SelectItem>
-                        <SelectItem value="dlogm">
+                        <SelectItem value="10bit" disabled={stabilized}>
+                          10-bit · Rec. 709
+                        </SelectItem>
+                        <SelectItem value="dlogm" disabled={stabilized}>
                           D-Log M · experimental
                         </SelectItem>
-                        <SelectItem value="shdr">
+                        <SelectItem value="shdr" disabled={stabilized}>
                           Sensor HDR · experimental
                         </SelectItem>
-                        <SelectItem value="lowlight">
+                        <SelectItem value="lowlight" disabled={stabilized}>
                           Low light · experimental
                         </SelectItem>
                       </SelectContent>
@@ -465,9 +524,7 @@ export function LivestreamPage() {
                   </div>
                 </div>
                 <div className="mt-4 rounded-lg border p-3 text-xs text-muted-foreground">
-                  RockSteady and Horizon correction are unavailable in the
-                  custom capture path until DJI’s stabilization setup is
-                  verified. Manage browser overlays in{" "}
+                  Manage browser overlays in{" "}
                   <a className="underline" href="#/studio">
                     Studio
                   </a>

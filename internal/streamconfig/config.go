@@ -11,6 +11,7 @@ import (
 )
 
 type Config struct {
+	Stabilization  string `json:"stabilization,omitempty"`
 	PreviewFile    string `json:"preview_file,omitempty"`
 	Address        string `json:"address"`
 	StreamID       string `json:"stream_id"`
@@ -31,6 +32,7 @@ func DefaultConfig() Config {
 	return Config{LatencyMS: 1000, Width: 1280, Height: 720, FPS: 30, BitrateKbps: 4000, AudioSource: "auto"}
 }
 
+func (c Config) Stabilized() bool  { return c.Stabilization != "" && c.Stabilization != "off" }
 func (c Config) NeuralAudio() bool { return c.NoiseMode() == "dji" || c.NoiseMode() == "rnnoise" }
 func (c Config) NoiseMode() string {
 	if c.NoiseReduction != "" {
@@ -42,6 +44,14 @@ func (c Config) NoiseMode() string {
 	return "off"
 }
 func (c Config) Validate() error {
+	switch c.Stabilization {
+	case "", "off", "rocksteady", "horizonsteady", "horizonbalancing":
+	default:
+		return errors.New("unsupported stabilization mode")
+	}
+	if c.Stabilized() && (c.FPS != 30 || (c.ImageMode != "" && c.ImageMode != "standard")) {
+		return errors.New("stabilization currently requires Standard 8-bit at 30 fps")
+	}
 	switch c.NoiseMode() {
 	case "off", "highpass", "dji", "rnnoise":
 	default:
@@ -129,7 +139,24 @@ func (c Config) Pipeline(testPattern bool) string {
 		split = "tee name=sensor ! queue max-size-buffers=4 max-size-bytes=0 max-size-time=0 ! "
 		preview = "sensor. ! queue leaky=downstream max-size-buffers=1 max-size-bytes=0 max-size-time=0 ! videorate drop-only=true ! video/x-raw,framerate=2/1 ! videoscale ! video/x-raw,width=640,height=360 ! videoconvert ! video/x-raw,format=I420 ! jpegenc quality=70 ! appsink name=preview sync=false max-buffers=1 drop=true wait-on-eos=false "
 	}
-	video := fmt.Sprintf("%s ! video/x-raw,format=%s,width=%d,height=%d,framerate=%d/1%s ! %s%sdjicamc2venc control-rate=constant target-bitrate=%d idr-interval=%d b-frames=0 ! video/x-h265,stream-format=byte-stream,alignment=au ! h265parse config-interval=-1 ! queue max-size-buffers=16 ! mux. ", source, format, c.Width, c.Height, c.FPS, colorimetry, split, overlay, c.BitrateKbps*1000, c.FPS)
+	cameraCaps := fmt.Sprintf("video/x-raw,format=%s,width=%d,height=%d,framerate=%d/1%s", format, c.Width, c.Height, c.FPS, colorimetry)
+	dummies := ""
+	if c.Stabilized() && !testPattern {
+		source = "djiqmmfsrc name=camera camera=0 camera.video_0"
+		// Linear GBM surfaces can be copied by FastCV for CPU overlays/preview.
+		// Keep the inactive recording track UBWC to reproduce DJI's graph setup.
+		cameraCaps = fmt.Sprintf("video/x-raw(memory:GBM),format=NV12,colorimetry=bt709,width=2560,height=1440,framerate=30/1 ! queue leaky=downstream max-size-buffers=2 max-size-bytes=0 max-size-time=0 ! qtifcvtransform ! video/x-raw,format=RGBA,width=%d,height=%d,framerate=30/1", c.Width, c.Height)
+		dummies = "camera.video_1 ! video/x-raw(memory:GBM),compression=ubwc,colorimetry=bt709,format=NV12,width=2560,height=1440,framerate=30/1 ! fakesink sync=false async=false camera.video_2 ! video/x-raw(memory:GBM),colorimetry=bt709,format=NV12,width=2560,height=1440,framerate=30/1 ! fakesink sync=false async=false "
+	}
+	encodeConvert := ""
+	if c.Stabilized() && !testPattern {
+		encodeConvert = "videoconvert ! video/x-raw,format=NV12 ! "
+	}
+	videoGate := ""
+	if c.Stabilized() && !testPattern {
+		videoGate = "identity name=videogate ! "
+	}
+	video := fmt.Sprintf("%s ! %s ! identity name=videoentry ! %s%s%sdjicamc2venc name=videoencoder control-rate=constant target-bitrate=%d idr-interval=%d b-frames=0 ! video/x-h265,stream-format=byte-stream,alignment=au ! h265parse config-interval=-1 ! %squeue max-size-buffers=16 ! mux. ", source, cameraCaps, split, overlay, encodeConvert, c.BitrateKbps*1000, c.FPS, videoGate)
 	audio := ""
 	if c.AudioSource != "" && c.AudioSource != "none" && c.AudioSource != "auto" {
 		capture := fmt.Sprintf("pulsesrc name=mic device=%s provide-clock=false client-name=osmo-stream", c.AudioSource)
@@ -153,7 +180,10 @@ func (c Config) Pipeline(testPattern bool) string {
 		}
 
 	}
-	return video + audio + preview + "mpegtsmux name=mux alignment=7 ! appsink name=encoded sync=false max-buffers=8 drop=false wait-on-eos=false"
+	if c.Stabilized() && !testPattern && audio != "" {
+		audio = strings.Replace(audio, "avenc_aac bitrate=", "identity name=audiogate ! avenc_aac bitrate=", 1)
+	}
+	return video + audio + preview + dummies + "mpegtsmux name=mux alignment=7 ! appsink name=encoded sync=false max-buffers=8 drop=false wait-on-eos=false"
 }
 
 type ProcessorStats struct {

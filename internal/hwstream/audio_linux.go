@@ -59,7 +59,7 @@ func checkedFile(path, want string) error {
 		return e
 	}
 	if fmt.Sprintf("%x", sha256.Sum256(b)) != want {
-		return fmt.Errorf("unsupported firmware audio asset: %s", path)
+		return fmt.Errorf("unsupported firmware asset: %s", path)
 	}
 	return nil
 }

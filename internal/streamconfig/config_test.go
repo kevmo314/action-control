@@ -126,3 +126,31 @@ func TestNeuralProcessingNeverTakesWirelessChannels(t *testing.T) {
 		}
 	}
 }
+
+func TestStabilizationProfilesRejectIncompatibleCapture(t *testing.T) {
+	c := DefaultConfig()
+	c.Address = "receiver:9000"
+	for _, mode := range []string{"rocksteady", "horizonsteady", "horizonbalancing"} {
+		c.Stabilization = mode
+		for _, size := range [][2]int{{1280, 720}, {1920, 1080}, {2560, 1440}} {
+			c.Width, c.Height = size[0], size[1]
+			if err := c.Validate(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		c.FPS = 25
+		if c.Validate() == nil {
+			t.Fatal("unverified stabilized sensor timing allowed")
+		}
+		c.FPS = 30
+		c.ImageMode = "shdr"
+		if c.Validate() == nil {
+			t.Fatal("unverified stabilization/HDR graph allowed")
+		}
+		c.ImageMode = ""
+	}
+	c.Stabilization = "eis"
+	if c.Validate() == nil {
+		t.Fatal("generic EIS incorrectly accepted as DJI stabilization")
+	}
+}

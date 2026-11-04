@@ -1,9 +1,45 @@
 # DJI stabilization investigation
 
-On the connected AC204, custom capture can now reach DJI's real EIS/IMU graph
-and deliver hardware HEVC frames. This is a capture prototype, not yet an option
-in the Go sender or web UI. Moving-camera stabilization, horizon-lock accuracy,
-overlay compatibility and audio timing on this new graph still need validation.
+Livestreaming offers **Off**, **RockSteady**, **HorizonSteady** and
+**HorizonBalancing**. Stabilized capture supports 720p, 1080p and 1440p in
+Standard 8-bit at 30 fps. It works with microphone audio, neural noise reduction,
+browser overlay burn-in and Studio's 2 fps camera preview. Horizon modes select
+a narrower, corrected FOV automatically. Native camera recording settings,
+wireless pairing and microphone gain are preserved.
+
+The sender checks the inspected firmware assets before opening the graph.
+Advanced image modes and 25 fps are rejected for stabilized capture. Mode
+changes require stopping and restarting the stream. Physical motion quality,
+full 360-degree behavior and calibrated sensor-to-microphone timing still need
+separate measurement.
+
+## Integrated frame and clock path
+
+The sender configures DJI's full-resolution realtime EIS graph with 4096×3072
+sensor mode 14 and a 2560×1440 preview surface. FastCV converts that linear GBM
+surface to RGBA and scales it to the chosen output size. Overlays blend into the
+CPU frame, then `videoconvert` produces NV12 for hardware HEVC. Studio's JPEG
+branch is independent of the encoder and shows the camera before overlay burn-in.
+Even 720p stabilized output uses this full sensor profile, so selecting a smaller
+output does not switch the sensor into its low-power mode.
+
+The RGBA conversion is deliberate: a same-format NV12 conversion could retain
+native buffer references and stall the 1080p pipeline after startup. A two-frame leaky queue before conversion keeps slow CPU work from blocking
+the native source; under load it drops raw frames before encoding. A bounded
+reserve of 16 extra source buffers accommodates the converter, tee and encoder;
+increasing that reserve alone did not fix the stall. The installed GPU
+`qtivtransform` also crashed in a probe, so this path uses CPU FastCV conversion.
+
+Steady/FOV metadata is applied after the first sensor frame. Output stays gated
+for one second and until a complete HEVC keyframe arrives. Audio earlier than
+that frame is dropped, preserving the common capture timestamps. Model delay
+compensation remains upstream of this audio gate. On stop, audio is drained and
+video is allowed to reach the captured audio endpoint before EOS. Inactive main
+and proxy tracks are excluded from mux shutdown. No manual physical sync offset
+has been added.
+
+The setup was discovered as follows; the initial short probes below preceded
+the integrated sender.
 
 ## What selects the graph
 
@@ -101,17 +137,37 @@ appsink. Full decoding passes; seeking directly into inter frames can still
 produce reference warnings until the next IDR. Integration should withhold
 output until a complete keyframe after the startup mode transition.
 
-Before enabling these modes in Livestreaming:
+## Integration validation
 
-- Gate the native recipe to inspected firmware/library hashes and compatible
-  sensor mode, frame rate, output size and FOV combinations.
-- Configure and activate pads in the correct order, and establish request
-  metadata before releasing usable encoded output.
-- Preserve an uncompressed output/conversion path for browser overlay blending
-  and the JPEG Studio preview; the current CPU overlay path cannot simply be
-  applied to a compressed UBWC surface.
-- Verify audio timestamps, stop/failure recovery and sustained capture on the new
-  graph, then measure motion/horizon behavior separately.
+The final 40-second 1440p run with the bounded source queue, RGBA conversion,
+DJI neural audio, overlays and JPEG preview decoded fully and stopped normally.
+It contained 1069 video frames over 37.82 seconds (~28.3 fps effective), with raw
+frame drops under CPU load (largest video PTS gap ~100 ms). Audio timestamps
+remained continuous at 21.333 ms. First PTS differed by 6.556 ms; video ended
+204 ms after audio. Thus 30 fps is the configured target, not a sustained-rate
+guarantee with all CPU processing enabled. Smaller outputs reduce this load.
 
+
+- A 35-second local 1440p HorizonBalancing capture combined DJI neural audio,
+  browser overlays and JPEG preview. Full decoding passed. Video packet spacing
+  stayed 33.377–33.389 ms; audio stayed 21.333–21.334 ms. First PTS differed by
+  10.689 ms and final packet ends by 54.034 ms.
+- A received 1080p HorizonSteady SRT clip with RNNoise and overlays contained
+  24.50 seconds of HEVC and 24.47 seconds of mono AAC. Full decoding passed;
+  first PTS differed by 6.067 ms and final ends by 26.722 ms. The current Tailscale
+  relay was tested at 2 Mbps video and 4000 ms SRT latency. A 6 Mbps / 1500 ms run
+  lost packets on that relay and failed decoding; local capture at 6 Mbps passed.
+- Browser checks verified the stabilization selector, incompatible mode/FPS
+  constraints, live 640×360 Studio background and no JavaScript errors. An
+  overlay text/color edit applied during streaming.
+- RockSteady 720p video-only SRT was verified, followed by receiver disconnect.
+  The sender reported the disconnect and native camera control recovered.
+  Restart followed by cancellation during startup also recovered normally.
+- Unit tests exercise startup keyframe selection, audio alignment, unknown PTS,
+  delayed-video drain and rejected capture combinations. `go test -race ./...`
+  and the TypeScript/Vite build pass.
+
+These timestamp checks establish software continuity and bounded endpoints;
+they do not establish physical lip-sync or performance while the camera moves.
 Private camera clips, calibration files, firmware libraries and raw diagnostic
 logs remain local research artifacts.

@@ -95,7 +95,7 @@ func (b *bufferedOutput) Close() error {
 			}
 			// ACKed packets can still be waiting in the receiver's TSBPD queue.
 			// Let them play out before sending the SRT shutdown handshake.
-			time.Sleep(min(2*time.Second, b.linger+100*time.Millisecond))
+			time.Sleep(min(8100*time.Millisecond, b.linger+100*time.Millisecond))
 		}
 		_ = b.output.Close()
 	})

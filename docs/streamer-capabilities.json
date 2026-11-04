@@ -200,14 +200,13 @@
     "native_wireless_probe": "../tools/probe-wireless-mic.py"
   },
   "not_implemented": [
-    "EIS/RockSteady/Horizon presets",
     "Wireless mic UI telemetry/control setters",
     "Adaptive bitrate policy",
     "Hardware-calibrated per-microphone A/V offsets",
     "Full DJI APU beamforming / AGC chain"
   ],
   "stabilization_prototype": {
-    "production_sender_integrated": false,
+    "production_sender_integrated": true,
     "modes_tested": [
       "RockSteady",
       "HorizonSteady",
@@ -230,6 +229,29 @@
     },
     "physical_motion_verified": false,
     "audio_and_overlay_combination_verified": false,
-    "recipe": "STABILIZATION.md"
+    "recipe": "STABILIZATION.md",
+    "integration": {
+      "modes": [
+        "rocksteady",
+        "horizonsteady",
+        "horizonbalancing"
+      ],
+      "output_sizes": [
+        "1280x720",
+        "1920x1080",
+        "2560x1440"
+      ],
+      "fps": 30,
+      "image_mode": "standard",
+      "audio": true,
+      "browser_overlays": true,
+      "jpeg_preview": true,
+      "sensor_profile": "4096x3072 mode 14, realtime EIS, 2560x1440 preview scaled by FastCV",
+      "startup": "settled keyframe plus aligned audio",
+      "recovery_tests": [
+        "receiver disconnect",
+        "cancel during startup"
+      ]
+    }
   }
 }

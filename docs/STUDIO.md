@@ -76,7 +76,7 @@ runtime when available. Neither launcher adds a boot hook.
 | Wind rumble filter | 180 Hz four-pole Chebyshev high-pass before AAC, applied only to the selected input; not DJI neural wind removal |
 | DJI neural wind reduction | Internal mic, mono 48 kHz; 1024-sample blocks, 128 ms model delay compensated in PTS; firmware hashes checked |
 | RNNoise small | Internal mic, mono 48 kHz; 480-sample blocks, 20 ms model delay compensated in PTS; optional sidecar library |
-| RockSteady / Horizon correction | Native graph prototype now produces HEVC with DJI EIS modes; Go sender/UI integration pending |
+| RockSteady / Horizon correction | RockSteady, HorizonSteady, HorizonBalancing; Standard 8-bit, 30 fps, 720p / 1080p / 1440p; compatible with audio, browser overlays and JPEG preview |
 
 Advanced modes are limited to 1080p30 pending further testing. Browser overlays
 are limited to 8-bit modes: P010 + `gdkpixbufoverlay` produced only 29 frames before
@@ -97,8 +97,11 @@ buffers and preview-only activation order. The prototype now reaches
 `DjiLowpowerPreview` and outputs HEVC with native RockSteady, HorizonSteady and
 HorizonBalancing modes. Horizon modes require the linear FOV mapping; an
 unsupported fisheye combination causes the stock algorithm to assert.
-This recipe has not been integrated into the Go sender or the web UI.
-See [native graph setup, tested modes and remaining work](STABILIZATION.md).
+The Go sender and web UI now integrate these modes. The production path uses
+the full-resolution realtime graph and a FastCV RGBA copy before CPU overlays
+and preview. Startup waits for the mode to settle and an independently decodable
+video frame; audio starts on that same capture timeline. See
+[native graph setup and verification](STABILIZATION.md).
 
 ### Internal microphone and timing
 
