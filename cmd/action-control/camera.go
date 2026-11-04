@@ -612,6 +612,7 @@ func RegisterCamera(mux *http.ServeMux, a *App) (func() error, error) {
 	c := &cameraController{app: a, state: "stopped", config: a.Config.Read()}
 	c.mimoPreview = newMimoPreview(c)
 	livestream := registerLivestream(mux, c)
+	registerTailscale(mux, livestream.scene.reload)
 	if a.RequireDevice() == nil && a.ScreenRequired() {
 		if err := c.ensureScreens(); err != nil {
 			return nil, err

@@ -40,7 +40,14 @@ type Scene = {
   };
 };
 const demo = `<meta charset="utf-8"><style>body{margin:0;background:transparent;color:white;font:700 28px system-ui}.label{display:inline-flex;gap:14px;align-items:center;background:#121820dd;border-left:5px solid #ec4266;border-radius:8px;padding:18px 24px}small{color:#8ef0cd;font-size:15px}</style><div class="label"><small>LIVE</small><span>Osmo Action 5</span><span id="clock"></span></div><script>setInterval(()=>document.getElementById('clock').textContent=new Date().toLocaleTimeString(),1000)</script>`;
-const documentKey = (source: Source) => JSON.stringify([source.kind, source.url, source.html, source.width, source.height]);
+const documentKey = (source: Source) =>
+  JSON.stringify([
+    source.kind,
+    source.url,
+    source.html,
+    source.width,
+    source.height,
+  ]);
 export function StudioPage() {
   const state = useAPI<Scene>("scene", undefined, 1000);
   const stream = useAPI<{
@@ -54,7 +61,9 @@ export function StudioPage() {
   const [error, setError] = useState("");
   const [tick, setTick] = useState(0);
   const [cameraVisible, setCameraVisible] = useState(false);
-  const [sourceVisible, setSourceVisible] = useState<Record<string, boolean>>({});
+  const [sourceVisible, setSourceVisible] = useState<Record<string, boolean>>(
+    {},
+  );
   const [rearOpen, setRearOpen] = useState(false);
   const [rearVisible, setRearVisible] = useState(false);
   const [rearFlipped, setRearFlipped] = useState(false);
@@ -123,6 +132,17 @@ export function StudioPage() {
       setError(errorText(e));
     }
   };
+  const reloadWebviews = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await post("scene/reload");
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
   const moveLayer = (delta: number) =>
     change((s) => {
       const a = [...s.sources],
@@ -181,6 +201,9 @@ export function StudioPage() {
         description="Compose browser overlays over the camera feed. Saved scenes burn into outgoing SRT."
         actions={
           <div className="flex gap-2">
+            <Button variant="outline" onClick={reloadWebviews} disabled={busy}>
+              Reload webviews
+            </Button>
             <Button variant="outline" onClick={reload} disabled={busy}>
               <RefreshCw className="size-4" />
               Reload
@@ -192,12 +215,38 @@ export function StudioPage() {
           </div>
         }
       />
-      <details className="mb-4 rounded-xl border border-slate-700 p-4" onToggle={event => setRearOpen(event.currentTarget.open)}>
-        <summary className="cursor-pointer font-medium">Rear screen preview</summary>
-        <p className="my-2 text-sm text-slate-400">Updates about every two seconds. Mirrors DJI menus and status graphics; the camera picture is on a separate display layer.</p>
-        <Button variant="outline" onClick={() => setRearFlipped(v => !v)}>Rotate 180°</Button>
-        {rearOpen && <img alt="Camera rear screen graphics" src={`/api/camera/rear-screen.png?t=${Math.floor(tick / 4)}`} onLoad={() => setRearVisible(true)} onError={() => setRearVisible(false)} className="mt-3 w-full max-w-[712px] rounded bg-black" style={{display: rearVisible ? "block" : "none", transform: rearFlipped ? "rotate(180deg)" : undefined}} />}
-        {!rearVisible && <p className="mt-3 text-sm text-slate-400">Rear screen preview unavailable.</p>}
+      <details
+        className="mb-4 rounded-xl border border-slate-700 p-4"
+        onToggle={(event) => setRearOpen(event.currentTarget.open)}
+      >
+        <summary className="cursor-pointer font-medium">
+          Rear screen preview
+        </summary>
+        <p className="my-2 text-sm text-slate-400">
+          Updates about every two seconds. Mirrors DJI menus and status
+          graphics; the camera picture is on a separate display layer.
+        </p>
+        <Button variant="outline" onClick={() => setRearFlipped((v) => !v)}>
+          Rotate 180°
+        </Button>
+        {rearOpen && (
+          <img
+            alt="Camera rear screen graphics"
+            src={`/api/camera/rear-screen.png?t=${Math.floor(tick / 4)}`}
+            onLoad={() => setRearVisible(true)}
+            onError={() => setRearVisible(false)}
+            className="mt-3 w-full max-w-[712px] rounded bg-black"
+            style={{
+              display: rearVisible ? "block" : "none",
+              transform: rearFlipped ? "rotate(180deg)" : undefined,
+            }}
+          />
+        )}
+        {!rearVisible && (
+          <p className="mt-3 text-sm text-slate-400">
+            Rear screen preview unavailable.
+          </p>
+        )}
       </details>
       {error && <Notice tone="error">{error}</Notice>}
       {state.error && <Notice tone="error">{errorText(state.error)}</Notice>}
@@ -225,7 +274,7 @@ export function StudioPage() {
               className="relative aspect-video touch-none select-none overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-black"
               onPointerDown={() => setSelected("")}
             >
-              {(
+              {
                 <img
                   src={`/api/livestream/background.jpg?t=${stream.data?.running ? tick : Math.floor(tick / 10)}`}
                   alt="Last captured camera frame"
@@ -234,7 +283,7 @@ export function StudioPage() {
                   onLoad={() => setCameraVisible(true)}
                   onError={() => setCameraVisible(false)}
                 />
-              )}
+              }
               {!cameraVisible && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-500">
                   <Camera className="size-12" />
@@ -244,7 +293,13 @@ export function StudioPage() {
                   </span>
                 </div>
               )}
-              {cameraVisible && <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-1 text-[10px] text-white">{stream.data?.running ? "Camera preview" : "Last captured frame · still"}</span>}
+              {cameraVisible && (
+                <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-1 text-[10px] text-white">
+                  {stream.data?.running
+                    ? "Camera preview"
+                    : "Last captured frame · still"}
+                </span>
+              )}
               {layout?.sources.map(
                 (v, i) =>
                   v.visible && (
@@ -265,15 +320,45 @@ export function StudioPage() {
                         src={`/api/scene/source/${encodeURIComponent(v.id)}?revision=${layout.revision}&t=${tick}`}
                         alt={`${v.name} preview`}
                         className="pointer-events-none absolute inset-0 size-full object-fill"
-                        style={{ opacity: v.opacity, visibility: sourceVisible[v.id] && state.data?.layout.sources.some(saved => saved.id === v.id && documentKey(saved) === documentKey(v)) ? "visible" : "hidden" }}
+                        style={{
+                          opacity: v.opacity,
+                          visibility:
+                            sourceVisible[v.id] &&
+                            state.data?.layout.sources.some(
+                              (saved) =>
+                                saved.id === v.id &&
+                                documentKey(saved) === documentKey(v),
+                            )
+                              ? "visible"
+                              : "hidden",
+                        }}
                         onError={() => {
-                          setSourceVisible(old => old[v.id] === false ? old : {...old, [v.id]: false});
+                          setSourceVisible((old) =>
+                            old[v.id] === false
+                              ? old
+                              : { ...old, [v.id]: false },
+                          );
                         }}
                         onLoad={() => {
-                          setSourceVisible(old => old[v.id] === true ? old : {...old, [v.id]: true});
+                          setSourceVisible((old) =>
+                            old[v.id] === true ? old : { ...old, [v.id]: true },
+                          );
                         }}
                       />
-                      {(!sourceVisible[v.id] || !state.data?.layout.sources.some(saved => saved.id === v.id && documentKey(saved) === documentKey(v))) && <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/60 p-2 text-center text-xs text-white">{dirty ? "Apply source changes" : state.data?.renderer.error ? "Webview failed to load — see renderer error" : "Loading webview…"}</span>}
+                      {(!sourceVisible[v.id] ||
+                        !state.data?.layout.sources.some(
+                          (saved) =>
+                            saved.id === v.id &&
+                            documentKey(saved) === documentKey(v),
+                        )) && (
+                        <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/60 p-2 text-center text-xs text-white">
+                          {dirty
+                            ? "Apply source changes"
+                            : state.data?.renderer.error
+                              ? "Webview failed to load — see renderer error"
+                              : "Loading webview…"}
+                        </span>
+                      )}
                       <span className="absolute -top-5 left-0 max-w-full truncate rounded bg-black/80 px-1 text-[10px] text-white">
                         {v.name}
                       </span>
@@ -456,7 +541,17 @@ export function StudioPage() {
                 </div>
                 {source.kind === "url" ? (
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between"><Label htmlFor="source-url">URL</Label><Button size="sm" variant="outline" disabled={!dirty || busy} onClick={save}>{busy ? "Applying…" : "Apply changes"}</Button></div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="source-url">URL</Label>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!dirty || busy}
+                        onClick={save}
+                      >
+                        {busy ? "Applying…" : "Apply changes"}
+                      </Button>
+                    </div>
                     <Input
                       id="source-url"
                       placeholder="https://…"

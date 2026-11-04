@@ -52,6 +52,11 @@ const AlbumPage = lazy(() =>
 const NetworkPage = lazy(() =>
   import("./pages/NetworkPage").then((page) => ({ default: page.NetworkPage })),
 );
+const TailscalePage = lazy(() =>
+  import("./pages/TailscalePage").then((page) => ({
+    default: page.TailscalePage,
+  })),
+);
 const SystemPage = lazy(() =>
   import("./pages/SystemPage").then((page) => ({ default: page.SystemPage })),
 );
@@ -77,6 +82,7 @@ const navigation = [
   { id: "album", name: "Album", icon: Images, page: AlbumPage },
   { id: "files", name: "Files", icon: Folder, page: FilesPage },
   { id: "network", name: "Network", icon: Wifi, page: NetworkPage },
+  { id: "tailscale", name: "Tailscale", icon: Radio, page: TailscalePage },
   { id: "processes", name: "Processes", icon: ListTree, page: ProcessPage },
   { id: "system", name: "System", icon: Settings2, page: SystemPage },
 ];

@@ -279,3 +279,15 @@ uninstall.*           ADB 卸载入口
 项目原创代码采用 [MIT 许可证](LICENSE)。第三方组件遵循各自的许可证；相关声明保存在 [`media/licenses/`](media/licenses/) 中，完整发布包还会收录依赖组件的许可证。
 
 FFmpeg / FFprobe 使用 LGPL-2.1-or-later，zlib 使用 Zlib 许可证，SQLite 属于公有领域。构建版本、配置及源码校验信息见 [`media/provenance.json`](media/provenance.json)。
+
+### Tailscale routing
+
+The **Tailscale** page shows the camera connection and the exit nodes available
+in its tailnet. Choose a node and **Apply route**, or choose **Direct connection**
+to clear it. Offline nodes cannot be selected. Exit routing applies to the whole
+camera, including browser overlays and public SRT destinations. Local network
+access remains enabled for the Wi-Fi gateway and DNS. Applying a route
+reconnects webviews without restarting the camera, GUI, or Tailscale daemon.
+The page uses the existing camera Tailscale installation and login; it does not
+install a daemon or change Serve settings. Routing preferences remain in
+Tailscale's persistent state. See [Tailscale's exit node documentation](https://tailscale.com/docs/features/exit-nodes/how-to/setup?tab=linux).

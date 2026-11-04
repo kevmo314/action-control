@@ -23,6 +23,7 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/emulation"
+	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 )
 
@@ -64,6 +65,7 @@ type sceneController struct {
 	outputDone        chan struct{}
 	previewPNG        []byte
 	sourcePNGs        map[string][]byte
+	reloadEpoch       uint64
 	publishedRevision uint64
 	outputError       string
 }
@@ -205,6 +207,10 @@ func registerScenes(mux *http.ServeMux, a *App) *sceneController {
 		w.Header().Set("Content-Type", "image/png")
 		_, _ = w.Write(data)
 	})
+	mux.HandleFunc("POST /api/scene/reload", func(w http.ResponseWriter, r *http.Request) {
+		s.reload()
+		jsonResponse(w, 200, map[string]bool{"ok": true})
+	})
 	go s.outputLoop()
 	go s.renderLoop()
 	return s
@@ -237,6 +243,7 @@ func (s *sceneController) renderLoop() {
 	var allocator context.Context
 	var stopAllocator context.CancelFunc
 	tabs := map[string]*browserSource{}
+	var appliedReload uint64
 	cleanup := func() {
 		for _, t := range tabs {
 			t.cancel()
@@ -258,7 +265,15 @@ func (s *sceneController) renderLoop() {
 		}
 		s.mu.Lock()
 		layout := s.layout
+		reloadEpoch := s.reloadEpoch
 		s.mu.Unlock()
+		if reloadEpoch != appliedReload {
+			for _, tab := range tabs {
+				tab.cancel()
+			}
+			tabs = map[string]*browserSource{}
+			appliedReload = reloadEpoch
+		}
 		started := time.Now()
 		canvas := image.NewNRGBA(image.Rect(0, 0, 1280, 720))
 		var renderErr error
@@ -306,6 +321,11 @@ func (s *sceneController) renderLoop() {
 					}
 					initCtx, stop := context.WithTimeout(tc, 10*time.Second)
 					err := chromedp.Run(initCtx, chromedp.EmulateViewport(int64(v.Width), int64(v.Height)), chromedp.ActionFunc(func(ctx context.Context) error {
+						// Browser-level settings survive document navigation and do not
+						// override author CSS (including an explicit white background).
+						if err := emulation.SetScrollbarsHidden(true).Do(ctx); err != nil {
+							return err
+						}
 						return emulation.SetDefaultBackgroundColorOverride().WithColor(&cdp.RGBA{R: 0, G: 0, B: 0, A: 0}).Do(ctx)
 					}), chromedp.Navigate(target))
 					stop()
@@ -318,7 +338,7 @@ func (s *sceneController) renderLoop() {
 				}
 				var data []byte
 				shotCtx, stop := context.WithTimeout(t.ctx, 3*time.Second)
-				err := chromedp.Run(shotCtx, chromedp.CaptureScreenshot(&data))
+				err := chromedp.Run(shotCtx, chromedp.ActionFunc(func(ctx context.Context) error { return page.BringToFront().Do(ctx) }), chromedp.CaptureScreenshot(&data))
 				stop()
 				if err != nil {
 					t.cancel()
@@ -347,7 +367,7 @@ func (s *sceneController) renderLoop() {
 			renderErr = encoder.Encode(&out, canvas)
 		}
 		s.mu.Lock()
-		if layout.Revision == s.layout.Revision {
+		if layout.Revision == s.layout.Revision && reloadEpoch == s.reloadEpoch {
 			s.sourcePNGs = sourcePNGs
 			if renderErr == nil {
 				s.previewPNG = out.Bytes()
@@ -405,4 +425,19 @@ func (s *sceneController) outputLoop() {
 // Geometry and opacity can change without reloading a browser document.
 func sameSourceDocument(a, b sceneSource) bool {
 	return a.Kind == b.Kind && a.URL == b.URL && a.HTML == b.HTML && a.Width == b.Width && a.Height == b.Height
+}
+
+// Reconnect browser sources after an internet route change, without touching
+// camera or GUI services. An in-flight capture cannot publish the old session.
+func (s *sceneController) reload() {
+	s.mu.Lock()
+	s.reloadEpoch++
+	s.sourcePNGs = nil
+	s.status.UpdatedAt = time.Time{}
+	s.status.Error = ""
+	s.mu.Unlock()
+	select {
+	case s.wake <- struct{}{}:
+	default:
+	}
 }

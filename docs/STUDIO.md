@@ -9,7 +9,14 @@ does not start capture or change camera services. Browser-source
 previews come from the camera renderer. Browser sources run as independent
 pages, so they do not depend on iframe embedding permission. They have no browser
 audio in the outgoing stream. Pages requiring login need a URL that works without
-an interactive login. HTML uses a separate `data:` origin.
+an interactive login. HTML uses a separate `data:` origin. Scrollbars are hidden
+by the browser for every source. The browser canvas defaults to transparent;
+background colors explicitly set by the page, including white, remain visible.
+Use **Reload webviews** to reconnect saved sources without changing their URLs
+or layout. Each page is activated before capture so its current browser surface
+is used. Tailscale exit-node changes also reconnect all saved webviews; pages
+with long-lived Firebase/WebSocket connections otherwise can keep an old,
+unusable session after the camera's route changes.
 
 Enable **Burn scene into SRT**, save, and wait for **RENDERER READY** before
 starting a stream. Studio renders saved browser sources even when burn-in is off.
