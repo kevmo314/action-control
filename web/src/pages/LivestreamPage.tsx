@@ -88,12 +88,18 @@ export function LivestreamPage() {
     3000,
   );
   const [draft, setDraft] = useState<StreamConfig>();
+  const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
-    if (stream.data && !draft)
+    if (!stream.data) return;
+    // Active controls describe the actual sender, including streams started in
+    // another tab or through the API. Only keep local edits while idle.
+    if (stream.data.running || !dirty) {
       setDraft({ ...stream.data.config, passphrase: "" });
-  }, [stream.data, draft]);
+      if (stream.data.running) setDirty(false);
+    }
+  }, [stream.data, dirty]);
   const active = stream.data?.running ?? false;
   const stabilized = !!draft?.stabilization && draft.stabilization !== "off";
   const stabilizationLabels: Record<string, string> = {
@@ -103,8 +109,10 @@ export function LivestreamPage() {
     horizonbalancing: "HorizonBalancing",
   };
   const disabled = busy || active;
-  const update = (change: Partial<StreamConfig>) =>
+  const update = (change: Partial<StreamConfig>) => {
     setDraft((c) => (c ? { ...c, ...change } : c));
+    setDirty(true);
+  };
   const start = async () => {
     if (!draft) return;
     setBusy(true);
@@ -117,6 +125,7 @@ export function LivestreamPage() {
       });
       update({ passphrase: "" });
       await invalidate("livestream");
+      setDirty(false);
     } catch (e) {
       setError(errorText(e));
       throw e;
@@ -138,6 +147,25 @@ export function LivestreamPage() {
   };
   const st = stream.data?.status;
   const sources = microphones.data?.sources ?? [];
+  const noiseMode =
+    draft?.noise_reduction || (draft?.wind_filter ? "highpass" : "off");
+  const wirelessPreferred = sources.some((source) =>
+    source.name.includes("wireless-mic"),
+  );
+  const neuralAvailable =
+    draft?.audio_source === "regular0" ||
+    (draft?.audio_source === "auto" && !wirelessPreferred);
+  const selectMicrophone = (audio_source: string) => {
+    const acceptsNeural =
+      audio_source === "regular0" ||
+      (audio_source === "auto" && !wirelessPreferred);
+    update({
+      audio_source,
+      ...(!acceptsNeural && ["dji", "rnnoise"].includes(noiseMode)
+        ? { noise_reduction: "off", wind_filter: false }
+        : {}),
+    });
+  };
   const selected = sources.find((s) => s.name === st?.audio_source);
   return (
     <>
@@ -235,7 +263,7 @@ export function LivestreamPage() {
                   <Select
                     value={draft.audio_source || "none"}
                     disabled={disabled}
-                    onValueChange={(audio_source) => update({ audio_source })}
+                    onValueChange={selectMicrophone}
                   >
                     <SelectTrigger
                       id="stream-microphone"
@@ -483,10 +511,7 @@ export function LivestreamPage() {
                     <Label htmlFor="stream-wind">Noise reduction</Label>
                     <Select
                       disabled={disabled || draft.audio_source === "none"}
-                      value={
-                        draft.noise_reduction ||
-                        (draft.wind_filter ? "highpass" : "off")
-                      }
+                      value={noiseMode}
                       onValueChange={(noise_reduction) =>
                         update({ noise_reduction, wind_filter: false })
                       }
@@ -499,14 +524,25 @@ export function LivestreamPage() {
                         <SelectItem value="highpass">
                           Wind rumble · 180 Hz high-pass
                         </SelectItem>
-                        <SelectItem value="dji">
+                        <SelectItem value="dji" disabled={!neuralAvailable}>
                           DJI neural · internal mic
                         </SelectItem>
-                        <SelectItem value="rnnoise">
+                        <SelectItem value="rnnoise" disabled={!neuralAvailable}>
                           RNNoise small · internal mic
                         </SelectItem>
                       </SelectContent>
                     </Select>
+                    {(active ||
+                      draft.audio_source === "none" ||
+                      !neuralAvailable) && (
+                      <p className="text-xs text-muted-foreground">
+                        {active
+                          ? "Showing the running stream’s noise reduction. Stop the stream to change it."
+                          : draft.audio_source === "none"
+                            ? "Choose an audio input above to enable noise reduction."
+                            : "Select the camera’s internal microphones to use a neural mode. Wireless channels support Off or Wind rumble."}
+                      </p>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       Neural modes process the internal mic in mono and
                       compensate their audio delay (DJI: 128 ms, RNNoise: 20
