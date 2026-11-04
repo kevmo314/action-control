@@ -205,5 +205,31 @@
     "Adaptive bitrate policy",
     "Hardware-calibrated per-microphone A/V offsets",
     "Full DJI APU beamforming / AGC chain"
-  ]
+  ],
+  "stabilization_prototype": {
+    "production_sender_integrated": false,
+    "modes_tested": [
+      "RockSteady",
+      "HorizonSteady",
+      "HorizonBalancing"
+    ],
+    "graphs": [
+      "DjiLowpowerPreview",
+      "DjiCommonRealtimeEISPreview"
+    ],
+    "highest_tested": {
+      "mode": "HorizonBalancing",
+      "width": 2560,
+      "height": 1440,
+      "frames": 895,
+      "duration_seconds": 29.909956,
+      "sensor_mode": 14,
+      "sensor_width": 4096,
+      "sensor_height": 3072,
+      "full_hevc_decode": "pass"
+    },
+    "physical_motion_verified": false,
+    "audio_and_overlay_combination_verified": false,
+    "recipe": "STABILIZATION.md"
+  }
 }

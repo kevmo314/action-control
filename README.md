@@ -27,7 +27,8 @@ camera and burned into outgoing SRT. Livestreaming also offers 10-bit Rec. 709,
 experimental D-Log M / sensor HDR / low-light modes, and noise reduction.
 Studio shows a 640×360 camera background at 2 fps while streaming.
 See [Studio setup, verified limits, and processing research](docs/STUDIO.md).
-RockSteady / Horizon correction remain unavailable in custom capture.
+A native RockSteady / Horizon capture prototype now produces HEVC; integration
+into the sender and UI is pending. See [stabilization research](docs/STABILIZATION.md).
 
 Build the English interface and the two executables:
 

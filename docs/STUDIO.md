@@ -76,7 +76,7 @@ runtime when available. Neither launcher adds a boot hook.
 | Wind rumble filter | 180 Hz four-pole Chebyshev high-pass before AAC, applied only to the selected input; not DJI neural wind removal |
 | DJI neural wind reduction | Internal mic, mono 48 kHz; 1024-sample blocks, 128 ms model delay compensated in PTS; firmware hashes checked |
 | RNNoise small | Internal mic, mono 48 kHz; 480-sample blocks, 20 ms model delay compensated in PTS; optional sidecar library |
-| RockSteady / Horizon correction | Not available in custom capture yet; see below |
+| RockSteady / Horizon correction | Native graph prototype now produces HEVC with DJI EIS modes; Go sender/UI integration pending |
 
 Advanced modes are limited to 1080p30 pending further testing. Browser overlays
 are limited to 8-bit modes: P010 + `gdkpixbufoverlay` produced only 29 frames before
@@ -90,13 +90,15 @@ The source's generic `eis=true` chooses Qualcomm's `PreviewEISDGV26` pipeline,
 not DJI's RockSteady node. On this firmware it fails with `TuningData Chromatix
 is NULL` / `EISDGV26 Get Chromatix data failed. Algo not initilized`. Supplying
 DJI's observed frame delay and IMU timing still selects that failing pipeline.
-Changing the video pad to main-video type without the generic flag produces
-frames through the ordinary `Preview` graph, without a DJI EIS node. The native
-camera instead uses DJI graphs with `com.dji.node.eis_preview`, an IMU node,
-steady mode, crop/lens configuration and calibrated IMU timing (observed timing
-varies by mode). Enabling the generic flag is therefore deliberately not offered
-as RockSteady or Horizon correction. Those require integration of DJI's graph
-selection and metadata setup; a successful bitstream alone would not verify them.
+Changing just the video pad role still produces ordinary `Preview` frames.
+
+Further investigation reproduced DJI's three configured stream roles, GBM/UBWC
+buffers and preview-only activation order. The prototype now reaches
+`DjiLowpowerPreview` and outputs HEVC with native RockSteady, HorizonSteady and
+HorizonBalancing modes. Horizon modes require the linear FOV mapping; an
+unsupported fisheye combination causes the stock algorithm to assert.
+This recipe has not been integrated into the Go sender or the web UI.
+See [native graph setup, tested modes and remaining work](STABILIZATION.md).
 
 ### Internal microphone and timing
 
