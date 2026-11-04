@@ -1,5 +1,10 @@
 # DJI stabilization investigation
 
+Known limitation: the custom stream remains upside down with an inverted camera
+when HorizonSteady is selected. Native mode selection is confirmed, but full
+horizon/orientation correction is not working end to end. No manual 180-degree
+flip is installed to conceal this failure.
+
 Livestreaming offers **Off**, **RockSteady**, **HorizonSteady** and
 **HorizonBalancing**. Stabilized capture supports 720p, 1080p and 1440p in
 Standard 8-bit at 30 fps. It works with microphone audio, neural noise reduction,
@@ -171,3 +176,44 @@ These timestamp checks establish software continuity and bounded endpoints;
 they do not establish physical lip-sync or performance while the camera moves.
 Private camera clips, calibration files, firmware libraries and raw diagnostic
 logs remain local research artifacts.
+
+## November 4 physical check and follow-up investigation
+
+A live 1080p30 HEVC/AAC SRT session with DJI neural audio and the Studio RTIRL
+layer was inspected in ffplay. The user confirmed good perceived audio quality
+and A/V sync. The camera picture was upside down while the browser overlay was
+upright. This is an orientation failure before composition, not a rotated web
+layer. This subjective sync check does not replace calibrated timing measures.
+
+A short subsequent capture recorded the native smoother actually transitioning
+to `smooth_mode: 0, steady_mode: 3, steady_submode: 0, fps: 30`. This confirms
+that our HorizonSteady request reaches DJI's preview algorithm. It does not
+establish correct gravity locking or 360-degree behavior.
+
+Offline inspection identified a separate native video/offline EIS path and
+`ChiDjiEISNode::UpdateEISRotationEnableToGlobelPool`. That method enables
+`com.dji.camera.EnableIPEEisRotate` for modes 3 and 6. The inspected camera HAL's
+vendor table places this BYTE/count-1 tag at `0x80b70020` (six entries after
+`EISSteadyMode`, immediately before `FovCtrlMode`). This node publishes the flag
+into CHI's usecase metadata pool; setting the same tag through ordinary source
+session/request metadata is not proven equivalent.
+
+Private, temporary trials found:
+
+- Enabling the main/proxy tracks produced video and initialized video/offline
+  smoothers, but those smoothers remained in mode 2 while the preview changed
+  to mode 3. This did not correct the image. That probe timed out during drain;
+  its independent cleanup restored native camera control.
+- Supplying the IPE rotation tag through session metadata, then through session
+  and video metadata at multiple initialization stages, still produced an
+  upside-down preview. These trial settings were not installed in the streamer.
+- A further all-track trial with early metadata failed during pipeline startup.
+  The QMMF monitor generated a core dump, accompanied by a kernel allocation
+  failure, and the service supervisor replaced QMMF. Native camera control and
+  both GUIs recovered; the camera did not reboot. Hardware probes stopped after
+  this failure. Do not treat this graph as a validated streaming path.
+
+The next work is to understand the native video-request metadata and usecase
+rotation/gravity path before changing production capture. Overlay composition
+must remain downstream of the corrected camera output. The reverted software
+rotation experiment is not part of the implementation.
