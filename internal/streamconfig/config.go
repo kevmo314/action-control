@@ -44,8 +44,8 @@ func (c Config) Validate() error {
 	if c.LatencyMS < 20 || c.LatencyMS > 8000 {
 		return errors.New("latency must be 20–8000 ms")
 	}
-	if !((c.Width == 1280 && c.Height == 720) || (c.Width == 1920 && c.Height == 1080)) {
-		return errors.New("choose 1280×720 or 1920×1080")
+	if !((c.Width == 1280 && c.Height == 720) || (c.Width == 1920 && c.Height == 1080) || (c.Width == 2560 && c.Height == 1440)) {
+		return errors.New("choose 1280×720, 1920×1080, or 2560×1440")
 	}
 	if c.FPS != 25 && c.FPS != 30 {
 		return errors.New("frame rate must be 25 or 30 fps")

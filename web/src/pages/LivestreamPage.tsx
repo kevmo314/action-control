@@ -341,6 +341,7 @@ export function LivestreamPage() {
                       <SelectContent>
                         <SelectItem value="1280x720">1280 × 720</SelectItem>
                         <SelectItem value="1920x1080">1920 × 1080</SelectItem>
+                        <SelectItem value="2560x1440">2560 × 1440</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
