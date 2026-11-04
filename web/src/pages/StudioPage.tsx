@@ -39,7 +39,7 @@ type Scene = {
     fps: number;
   };
 };
-const demo = `<style>body{margin:0;background:transparent;color:white;font:700 28px system-ui}.label{display:inline-flex;gap:14px;align-items:center;background:#121820dd;border-left:5px solid #ec4266;border-radius:8px;padding:18px 24px}small{color:#8ef0cd;font-size:15px}</style><div class="label"><small>● LIVE</small><span>Osmo Action 5</span><span id="clock"></span></div><script>setInterval(()=>document.getElementById('clock').textContent=new Date().toLocaleTimeString(),1000)</script>`;
+const demo = `<meta charset="utf-8"><style>body{margin:0;background:transparent;color:white;font:700 28px system-ui}.label{display:inline-flex;gap:14px;align-items:center;background:#121820dd;border-left:5px solid #ec4266;border-radius:8px;padding:18px 24px}small{color:#8ef0cd;font-size:15px}</style><div class="label"><small>LIVE</small><span>Osmo Action 5</span><span id="clock"></span></div><script>setInterval(()=>document.getElementById('clock').textContent=new Date().toLocaleTimeString(),1000)</script>`;
 export function StudioPage() {
   const state = useAPI<Scene>("scene", undefined, 1000);
   const stream = useAPI<{
@@ -220,17 +220,6 @@ export function StudioPage() {
                   SRT
                 </span>
               </div>
-              <img
-                src={`/api/scene/frame.png?t=${tick}`}
-                alt="Saved browser overlays"
-                className="pointer-events-none absolute inset-0 size-full object-fill"
-                onError={(e) => {
-                  e.currentTarget.style.visibility = "hidden";
-                }}
-                onLoad={(e) => {
-                  e.currentTarget.style.visibility = "visible";
-                }}
-              />
               {layout?.sources.map(
                 (v, i) =>
                   v.visible && (
@@ -246,6 +235,18 @@ export function StudioPage() {
                         zIndex: i + 1,
                       }}
                     >
+                      <img
+                        src={`/api/scene/source/${encodeURIComponent(v.id)}?t=${tick}`}
+                        alt={`${v.name} preview`}
+                        className="pointer-events-none absolute inset-0 size-full object-fill"
+                        style={{ opacity: v.opacity }}
+                        onError={(e) => {
+                          e.currentTarget.style.visibility = "hidden";
+                        }}
+                        onLoad={(e) => {
+                          e.currentTarget.style.visibility = "visible";
+                        }}
+                      />
                       <span className="absolute -top-5 left-0 max-w-full truncate rounded bg-black/80 px-1 text-[10px] text-white">
                         {v.name}
                       </span>
@@ -340,6 +341,8 @@ export function StudioPage() {
               Burn scene into SRT
             </label>
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              Preview works with burn-in off. Save URL or HTML changes to render
+              them; placement, visibility, and opacity preview immediately.
               Enable and save before starting a stream. Source edits,
               visibility, and order update live after saving. Disable and save
               to clear overlays.

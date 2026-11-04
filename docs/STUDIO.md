@@ -9,7 +9,10 @@ audio in the outgoing stream. Pages requiring login need a URL that works withou
 an interactive login. HTML uses a separate `data:` origin.
 
 Enable **Burn scene into SRT**, save, and wait for **RENDERER READY** before
-starting a stream. Source changes apply after saving, including during a stream
+starting a stream. Studio renders saved browser sources even when burn-in is off.
+Placement and opacity preview immediately; save URL/HTML changes to render them.
+The preview is separate from the stream layer, so disabling burn-in clears the
+stream even if a preview page stalls. Source changes apply after saving, including during a stream
 started with overlays enabled. Disabling and saving clears the layer. A stream
 started without overlays needs a restart to add the overlay layer.
 

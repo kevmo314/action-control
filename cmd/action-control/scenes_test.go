@@ -2,7 +2,11 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -70,6 +74,7 @@ func TestSceneMustBeFreshBeforeCameraHandoff(t *testing.T) {
 		t.Fatal("failed renderer allowed")
 	}
 	s.status.Error = ""
+	s.publishedRevision = 2
 	if p, e := s.prepare(); e != nil || p != s.frame {
 		t.Fatalf("fresh scene: %s %v", p, e)
 	}
@@ -103,5 +108,53 @@ func TestRejectInvalidSceneGeometryAndSources(t *testing.T) {
 				t.Fatal("invalid scene accepted")
 			}
 		})
+	}
+}
+
+func TestStudioPreviewDoesNotLeakIntoDisabledStream(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	preview := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	preview.Set(0, 0, color.NRGBA{R: 255, A: 255})
+	var b bytes.Buffer
+	if err := png.Encode(&b, preview); err != nil {
+		t.Fatal(err)
+	}
+	s := &sceneController{ctx: ctx, frame: filepath.Join(t.TempDir(), "output.png"), outputDone: make(chan struct{}), layout: sceneLayout{Revision: 7}, status: sceneRenderStatus{Revision: 7, UpdatedAt: time.Now()}, previewPNG: b.Bytes()}
+	go s.outputLoop()
+	defer func() { cancel(); <-s.outputDone }()
+	waitAlpha := func(want uint32) {
+		t.Helper()
+		until := time.Now().Add(2 * time.Second)
+		for time.Now().Before(until) {
+			f, e := os.Open(s.frame)
+			if e == nil {
+				im, e := png.Decode(f)
+				f.Close()
+				if e == nil {
+					_, _, _, a := im.At(0, 0).RGBA()
+					if a == want {
+						return
+					}
+				}
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		t.Fatalf("output did not reach alpha %d", want)
+	}
+	waitAlpha(0)
+	s.mu.Lock()
+	s.layout.Enabled = true
+	s.mu.Unlock()
+	waitAlpha(65535)
+	s.mu.Lock()
+	s.layout.Enabled = false
+	s.status.Error = "preview page stalled"
+	s.mu.Unlock()
+	waitAlpha(0)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !bytes.Equal(s.previewPNG, b.Bytes()) {
+		t.Fatal("disabling burn-in cleared Studio preview")
 	}
 }

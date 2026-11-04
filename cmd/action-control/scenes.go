@@ -52,15 +52,20 @@ type sceneRenderStatus struct {
 	FPS       float64   `json:"fps"`
 }
 type sceneController struct {
-	mu     sync.Mutex
-	layout sceneLayout
-	status sceneRenderStatus
-	dir    string
-	frame  string
-	ctx    context.Context
-	cancel context.CancelFunc
-	wake   chan struct{}
-	done   chan struct{}
+	mu                sync.Mutex
+	layout            sceneLayout
+	status            sceneRenderStatus
+	dir               string
+	frame             string
+	ctx               context.Context
+	cancel            context.CancelFunc
+	wake              chan struct{}
+	done              chan struct{}
+	outputDone        chan struct{}
+	previewPNG        []byte
+	sourcePNGs        map[string][]byte
+	publishedRevision uint64
+	outputError       string
 }
 
 var sourceID = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
@@ -107,7 +112,7 @@ func registerScenes(mux *http.ServeMux, a *App) *sceneController {
 		}
 	}
 	ctx, cancel := context.WithCancel(a.Ctx)
-	s := &sceneController{dir: dir, frame: filepath.Join(a.RunDir, "scene.png"), ctx: ctx, cancel: cancel, wake: make(chan struct{}, 1), done: make(chan struct{}), layout: sceneLayout{Sources: []sceneSource{}}}
+	s := &sceneController{dir: dir, frame: filepath.Join(a.RunDir, "scene.png"), ctx: ctx, cancel: cancel, wake: make(chan struct{}, 1), done: make(chan struct{}), outputDone: make(chan struct{}), sourcePNGs: make(map[string][]byte), layout: sceneLayout{Sources: []sceneSource{}}}
 	if b, e := os.ReadFile(filepath.Join(dir, "scene.json")); e == nil {
 		var v sceneLayout
 		if json.Unmarshal(b, &v) == nil && validateScene(v) == nil {
@@ -117,7 +122,11 @@ func registerScenes(mux *http.ServeMux, a *App) *sceneController {
 	mux.HandleFunc("GET /api/scene", func(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		jsonResponse(w, 200, map[string]any{"layout": s.layout, "renderer": s.status, "width": 1280, "height": 720, "target_fps": 2})
+		status := s.status
+		if s.outputError != "" {
+			status.Error = s.outputError
+		}
+		jsonResponse(w, 200, map[string]any{"layout": s.layout, "renderer": status, "width": 1280, "height": 720, "target_fps": 2})
 	})
 	mux.HandleFunc("POST /api/scene", func(w http.ResponseWriter, r *http.Request) {
 		var v sceneLayout
@@ -156,12 +165,31 @@ func registerScenes(mux *http.ServeMux, a *App) *sceneController {
 	})
 	mux.HandleFunc("GET /api/scene/frame.png", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/png")
-		http.ServeFile(w, r, s.frame)
+		s.mu.Lock()
+		data := s.previewPNG
+		s.mu.Unlock()
+		if len(data) == 0 {
+			http.Error(w, "preview is starting", 503)
+			return
+		}
+		_, _ = w.Write(data)
 	})
+	mux.HandleFunc("GET /api/scene/source/{id}", func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		data := s.sourcePNGs[r.PathValue("id")]
+		s.mu.Unlock()
+		if len(data) == 0 {
+			http.Error(w, "save this source to render a preview", 404)
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write(data)
+	})
+	go s.outputLoop()
 	go s.renderLoop()
 	return s
 }
-func (s *sceneController) close() { s.cancel(); <-s.done }
+func (s *sceneController) close() { s.cancel(); <-s.done; <-s.outputDone }
 
 // A fresh, matching revision is required before taking the camera away from DJI.
 func (s *sceneController) prepare() (string, error) {
@@ -170,7 +198,7 @@ func (s *sceneController) prepare() (string, error) {
 	if !s.layout.Enabled {
 		return "", nil
 	}
-	if s.status.Revision != s.layout.Revision || s.status.UpdatedAt.IsZero() || time.Since(s.status.UpdatedAt) > 10*time.Second || s.status.Error != "" {
+	if s.outputError != "" || s.publishedRevision != s.layout.Revision || s.status.Revision != s.layout.Revision || s.status.UpdatedAt.IsZero() || time.Since(s.status.UpdatedAt) > 10*time.Second || s.status.Error != "" {
 		return "", errors.New("scene renderer is not ready; check Studio before starting")
 	}
 	return s.frame, nil
@@ -214,7 +242,8 @@ func (s *sceneController) renderLoop() {
 		started := time.Now()
 		canvas := image.NewNRGBA(image.Rect(0, 0, 1280, 720))
 		var renderErr error
-		if !layout.Enabled {
+		sourcePNGs := make(map[string][]byte)
+		if len(layout.Sources) == 0 {
 			cleanup()
 		} else {
 			needed := map[string]bool{}
@@ -277,6 +306,7 @@ func (s *sceneController) renderLoop() {
 					renderErr = fmt.Errorf("%s: %w", v.Name, err)
 					break
 				}
+				sourcePNGs[v.ID] = data
 				im, err := png.Decode(bytes.NewReader(data))
 				if err != nil {
 					renderErr = err
@@ -299,7 +329,8 @@ func (s *sceneController) renderLoop() {
 		s.mu.Lock()
 		if layout.Revision == s.layout.Revision {
 			if renderErr == nil {
-				renderErr = atomicWrite(s.frame, out.Bytes(), 0600)
+				s.previewPNG = out.Bytes()
+				s.sourcePNGs = sourcePNGs
 			}
 			s.status.Error = ""
 			if renderErr != nil {
@@ -308,6 +339,42 @@ func (s *sceneController) renderLoop() {
 				s.status.Revision = layout.Revision
 				s.status.UpdatedAt = time.Now().UTC()
 				s.status.FPS = math.Min(2, 1/time.Since(started).Seconds())
+			}
+		}
+		s.mu.Unlock()
+	}
+}
+
+// Output publication is separate from page loading. Turning burn-in off always
+// clears a running stream's layer, even if an external preview page has stalled.
+func (s *sceneController) outputLoop() {
+	defer close(s.outputDone)
+	var blank bytes.Buffer
+	_ = png.Encode(&blank, image.NewNRGBA(image.Rect(0, 0, 1280, 720)))
+	ticker := time.NewTicker(250 * time.Millisecond)
+	defer ticker.Stop()
+	var publishedAt time.Time
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-ticker.C:
+		}
+		s.mu.Lock()
+		if !s.layout.Enabled {
+			err := atomicWrite(s.frame, blank.Bytes(), 0600)
+			s.outputError = ""
+			if err != nil {
+				s.outputError = err.Error()
+			}
+		} else if len(s.previewPNG) > 0 && s.status.Error == "" && s.status.Revision == s.layout.Revision && !s.status.UpdatedAt.Equal(publishedAt) {
+			err := atomicWrite(s.frame, s.previewPNG, 0600)
+			s.outputError = ""
+			if err != nil {
+				s.outputError = err.Error()
+			} else {
+				s.publishedRevision = s.layout.Revision
+				publishedAt = s.status.UpdatedAt
 			}
 		}
 		s.mu.Unlock()
