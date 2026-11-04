@@ -311,6 +311,7 @@ func (s *livestreamController) stop() error {
 func registerLivestream(mux *http.ServeMux, c *cameraController) *livestreamController {
 	s := &livestreamController{camera: c, config: streamconfig.DefaultConfig(), last: livestreamStatus{State: "stopped", Codec: "H.265 / HEVC"}}
 	s.scene = registerScenes(mux, c.app)
+	registerRearScreen(mux)
 	mux.HandleFunc("GET /api/livestream/preview.jpg", func(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		active := s.run != nil

@@ -53,6 +53,9 @@ export function StudioPage() {
   const [error, setError] = useState("");
   const [tick, setTick] = useState(0);
   const [cameraVisible, setCameraVisible] = useState(false);
+  const [rearOpen, setRearOpen] = useState(false);
+  const [rearVisible, setRearVisible] = useState(false);
+  const [rearFlipped, setRearFlipped] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (state.data && !layout) setLayout(state.data.layout);
@@ -187,6 +190,13 @@ export function StudioPage() {
           </div>
         }
       />
+      <details className="mb-4 rounded-xl border border-slate-700 p-4" onToggle={event => setRearOpen(event.currentTarget.open)}>
+        <summary className="cursor-pointer font-medium">Rear screen preview</summary>
+        <p className="my-2 text-sm text-slate-400">Updates about every two seconds. Mirrors DJI menus and status graphics; the camera picture is on a separate display layer.</p>
+        <Button variant="outline" onClick={() => setRearFlipped(v => !v)}>Rotate 180°</Button>
+        {rearOpen && <img alt="Camera rear screen graphics" src={`/api/camera/rear-screen.png?t=${Math.floor(tick / 4)}`} onLoad={() => setRearVisible(true)} onError={() => setRearVisible(false)} className="mt-3 w-full max-w-[712px] rounded bg-black" style={{display: rearVisible ? "block" : "none", transform: rearFlipped ? "rotate(180deg)" : undefined}} />}
+        {!rearVisible && <p className="mt-3 text-sm text-slate-400">Rear screen preview unavailable.</p>}
+      </details>
       {error && <Notice tone="error">{error}</Notice>}
       {state.error && <Notice tone="error">{errorText(state.error)}</Notice>}
       {state.data?.renderer.error && (

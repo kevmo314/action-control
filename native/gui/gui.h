@@ -42,6 +42,7 @@ typedef struct {
 } AcStatus;
 
 extern AcStatus ac_status;
+extern int ac_screen_test;
 extern char ac_ui_debug[65536];
 extern _Atomic int ac_ui_debug_ready;
 

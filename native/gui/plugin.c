@@ -30,6 +30,7 @@ static int (*real_create)(const char *,void **);
 static void *real_library,*ew_context;
 static const uint32_t *ew_update_cycle;
 static int menu_mode;
+int ac_screen_test;
 static char state_dir[256];
 static _Atomic int attached;
 
@@ -165,7 +166,7 @@ static void *report_worker(void *unused) {
         if(atomic_load(&ac_ui_debug_ready)) {
             char path[320];snprintf(path,sizeof(path),"%s/tree.txt",state_dir);
             fd=open(path,O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC|O_NOFOLLOW,0600);
-            if(fd>=0){(void)write(fd,ac_ui_debug,strlen(ac_ui_debug));close(fd);}
+            if(fd>=0){ssize_t written=write(fd,ac_ui_debug,strlen(ac_ui_debug));(void)written;close(fd);}
             atomic_store(&ac_ui_debug_ready,0);
         }
         fd=atomic_load(&ac_status.command)?-1:open(control,O_RDONLY|O_CLOEXEC|O_NOFOLLOW);
@@ -202,7 +203,7 @@ static void *report_worker(void *unused) {
         atomic_store(&ac_status.hotspot_on,read_wlan0_on());
         /* Fetch both QR matrices once the backend answers; retry each 500ms
            tick until both land, then publish for the GUI thread to draw. */
-        if(!atomic_load(&ac_qr_ready)) {
+        if(!ac_screen_test && !atomic_load(&ac_qr_ready)) {
             int w=fetch_qr("/api/hotspot_qr?kind=wifi",ac_qr_wifi);
             int u=fetch_qr("/api/hotspot_qr?kind=url",ac_qr_url);
             if(w>0 && u>0) {
@@ -232,7 +233,7 @@ static void attach_extension(void) {
     /* Config-parameter values win; env is the trial-harness fallback. */
     const char *mode=param_mode?param_mode:getenv("ACTION_CONTROL_GUI_MODE");
     const char *directory=param_state?param_state:getenv("ACTION_CONTROL_GUI_STATE");
-    if(!mode || (strcmp(mode,"probe") && strcmp(mode,"menu")))return;
+    if(!mode || (strcmp(mode,"probe") && strcmp(mode,"menu") && strcmp(mode,"screen")))return;
     if(!directory || strncmp(directory,"/run/action-control-ui-",23) || strlen(directory)>=sizeof(state_dir))return;
     /* Self-create the state dir as root 0700 so attach never depends on a
        systemd ExecStartPre that this device skips at cold boot. */
@@ -258,7 +259,8 @@ static void attach_extension(void) {
     if(slots[0]||slots[1]||slots[2]) {
         fprintf(stderr,"action-control-gui: user event slot occupied; using original plugin\n");return;
     }
-    menu_mode=!strcmp(mode,"menu");
+    ac_screen_test=!strcmp(mode,"screen");
+    menu_mode=!strcmp(mode,"menu") || ac_screen_test;
     if(menu_mode && ac_ui_prepare()) {atomic_store(&ac_status.error,2);menu_mode=0;}
     pthread_t worker;
     if(pthread_create(&worker,NULL,report_worker,NULL))return;

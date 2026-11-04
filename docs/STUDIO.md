@@ -159,3 +159,39 @@ Desktop and 390-pixel mobile Studio UI were exercised without JavaScript errors
 or horizontal overflow. A separate Go sender test verified 1080p30 Main 10
 with internal AAC audio and the wind filter. Test clips and proprietary firmware libraries are local
 research artifacts, not repository assets.
+
+## Rear display preview and temporary screen test
+
+Studio's **Rear screen preview** reads the rear GUI graphics plane at most once
+per two seconds, on demand while the panel is open. It uses a separate bounded
+Python process, read-only process memory and DMA mappings, and exact firmware
+fingerprints. It never pauses the GUI, changes display properties, or restarts a
+service. Unsupported firmware and unstable captures return an unavailable state.
+The preview has a 180-degree rotation button. The native camera picture uses a
+separate plane and is not included in this preview.
+
+The native plugin also has an experimental `ac_mode=screen` that draws a green
+`OSMO SRT - REAR SCREEN TEST` panel with a counter on the GUI thread. This is a
+rendering test, not livestream telemetry. It is not installed by the web preview.
+On this firmware, DJI's USB connection modal is in a separate dialog layer and
+covers the application's widgets. Moving the widget within the application does
+not place it above the modal.
+
+During the November 4 device trial, the modal's visibility bit was temporarily
+cleared in RAM after validating the executable fingerprint, class, bounds, PID
+and original flags. This exposed the test panel without restarting the GUI or
+changing USB/ADB state. Dirty-region rendering can leave portions of the old
+USB page visible until a full repaint. This experiment is not an automatic
+feature of the server. Its saved original value can be restored on that same
+process with:
+
+```sh
+python3 -I -B /run/action-control-ui-screen/restore-usb-modal.py
+```
+
+The trial's plugin and service configuration override are under `/run` only.
+Its automatic rollback timer was cancelled at the user's request because rollback
+would restart the GUI. Do not restart camera services to iterate on this trial.
+The web endpoint was tested on-device at 712×400; display scanout matched the
+captured GUI buffer and native frame presentation continued. Physical screen
+confirmation remains a separate check.

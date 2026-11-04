@@ -467,6 +467,35 @@ void ac_ui_tick(void *context,int32_t *changed) {
     if(root_object && root!=root_object) {detach_menu();hide_panel();}
     root_object=root;
     uint32_t now=ew.ticks();
+    if(ac_screen_test) {
+        /* Attach to the application root so the USB-connected page also shows it.
+           All EW allocations and setters stay on the native GUI thread. */
+        static void *banner,*label;
+        static uint32_t shown_second=UINT32_MAX;
+        if(!banner) {
+            banner=ew.new_object(ew.group_class,NULL);
+            ew.lock(banner);
+            ew.bounds(banner,(AcRect){24,80,688,240});
+            void *background=ew.new_object(ew.rectangle_class,NULL);
+            ew.bounds(background,(AcRect){0,0,664,160});
+            ew.rectangle_color(background,0xff244522);
+            ew.add(banner,background,0);
+            make_text(banner,(AcRect){8,8,656,65},"OSMO SRT - REAR SCREEN TEST",0xffffffff);
+            label=make_text(banner,(AcRect){8,75,656,145},"Starting...",0xffb5ff9c);
+            ew.add(root_object,banner,0);
+            atomic_store(&ac_status.panel_visible,1);
+            dump_tree();
+        }
+        if(now/1000!=shown_second) {
+            char text[80];shown_second=now/1000;
+            ew.remove(root_object,banner);
+            ew.add(root_object,banner,0);
+            snprintf(text,sizeof(text),"Display test: %u seconds",shown_second);
+            ew.text_string(label,string(text));
+            if(changed)*changed=1;
+        }
+        return;
+    }
     if(!last_scan || now-last_scan>=50) {
         void *page=NULL,*control=NULL,*liveview=NULL;int budget=4096;
         find_three(root_object,ew.settings_class,ew.control_class,ew.liveview_class,&page,&control,&liveview,0,&budget);
