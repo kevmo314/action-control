@@ -151,6 +151,12 @@ try {
     },
   );
   await verifyELF(join(payload, "action-control"));
+  // The small streamer uses the camera's existing GStreamer/Codec2 libraries
+  // through purego. The console itself remains a static executable.
+  run("go", ["build", "-trimpath", "-ldflags", "-s -w", "-o",
+    join(payload, "bin", "osmo-stream"), "./cmd/osmo-stream"], {
+    env: { ...process.env, GOOS: "linux", GOARCH: "arm64", CGO_ENABLED: "0" },
+  });
   for (const tool of ["ffmpeg", "ffprobe", "sqlite3"])
     await copyFile(join(media, "bin", tool), join(payload, "bin", tool));
   run("node", [join(root, "tools", "build-gui-plugin.mjs")]);
@@ -223,6 +229,15 @@ try {
     join(sys.Dir, "LICENSE"),
     join(licenses, "golang.org-x-sys-LICENSE.txt"),
   );
+  for (const name of ["github.com/datarhei/gosrt", "github.com/ebitengine/purego", "golang.org/x/net"]) {
+    const dependency = JSON.parse(capture("go", ["list", "-m", "-json", name]));
+    await copyFile(join(dependency.Dir, "LICENSE"),
+      join(licenses, `${name.replaceAll("/", "-")}-LICENSE.txt`));
+  }
+  // openpgp retains the Go Authors BSD notices in its source files; its module
+  // archive omits the referenced LICENSE file. Include the Go BSD license.
+  await copyFile(join(capture("go", ["env", "GOROOT"]), "LICENSE"),
+    join(licenses, "github.com-benburkert-openpgp-LICENSE.txt"));
   await copyFile(
     join(media, "provenance.json"),
     join(licenses, "media-provenance.json"),

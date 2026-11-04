@@ -611,6 +611,7 @@ func (c *cameraController) snapshot(w http.ResponseWriter, r *http.Request) {
 func RegisterCamera(mux *http.ServeMux, a *App) (func() error, error) {
 	c := &cameraController{app: a, state: "stopped", config: a.Config.Read()}
 	c.mimoPreview = newMimoPreview(c)
+	livestream := registerLivestream(mux, c)
 	if a.RequireDevice() == nil && a.ScreenRequired() {
 		if err := c.ensureScreens(); err != nil {
 			return nil, err
@@ -686,6 +687,9 @@ func RegisterCamera(mux *http.ServeMux, a *App) (func() error, error) {
 		jsonResponse(w, 200, map[string]any{"ok": true, "services": services, "reboot_required": true})
 	})
 	return func() error {
+		if err := livestream.stop(); err != nil {
+			return err
+		}
 		c.operation.Lock()
 		defer c.operation.Unlock()
 		err := errors.Join(c.mimoPreview.stop(), c.stop())

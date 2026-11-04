@@ -1,5 +1,65 @@
 # Action Control
 
+This fork has an English web interface and a **Livestreaming** page for a small
+Go SRT sender. It captures sensor frames through the stock QMMF plugin, uses
+Codec2 hardware H.265 encoding, and sends MPEG-TS directly from Go. Microphone
+audio is encoded as AAC-LC, 48 kHz stereo, 128 kbps. It does not use Mimo preview,
+DJI's livestream service, `gst-launch`, or an FFmpeg subprocess.
+
+The camera must be idle before starting. The console temporarily stops only
+`dji_camera3.service`, then restores it on stop or sender failure. Bluetooth,
+wireless-mic, PulseAudio, display, and network services stay running. Camera
+recording controls are locked while the sender owns the sensor. No firmware or
+boot configuration changes are needed to try this.
+
+Audio selection supports internal microphones, detected PulseAudio inputs,
+automatic preference for DJI wireless mics, and video only. Pair DJI transmitters
+using the camera settings. Selection is pinned at start; a disconnected or
+rerouted input stops the stream instead of choosing another microphone.
+Internal audio has been tested. DJI wireless PCM capture and dual-transmitter
+channel mapping still require a connected transmitter test. Internal capture
+currently bypasses DJI's APU wind-noise/AGC processing.
+
+Build the English interface and the two executables:
+
+```sh
+npm --prefix web ci
+npm --prefix web run build
+mkdir -p cmd/action-control/web/dist build
+cp -R web/dist/. cmd/action-control/web/dist/
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o build/action-control ./cmd/action-control
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o build/osmo-stream ./cmd/osmo-stream
+```
+
+Place `osmo-stream` beside the console executable, or in its installed `bin/`
+directory. The sender dynamically loads the camera's existing GStreamer 1.x
+libraries. The console remains static. The release builder includes the sender.
+For an isolated trial, run the console with a temporary `--root` and a loopback
+`--listen`; Livestreaming independently verifies the real camera before allowing
+a sensor handoff.
+
+For the tested standalone deployment, durable binaries can be kept in
+`/blackbox/upgrade/osmo-srt/console`; `tools/start-camera-console.sh` starts that
+copy with an isolated runtime directory. It adds no automatic boot startup.
+
+Use `ffplay 'srt://0.0.0.0:9000?mode=listener&latency=1500000'` on the receiver,
+then enter its reachable IP/hostname and port in Livestreaming. The camera is the
+SRT caller. Encryption and Stream ID are optional. Passphrases are held only for
+the active run and are not returned by status APIs or saved in browser storage.
+
+Research tools: `tools/inspect-camera-capabilities.py` inventories advertised
+capture/encoder controls without opening the sensor;
+`tools/probe-wireless-mic.py` reads the inspected firmware's native mic capability
+and connection status, gated by the exact library hash. The observed controls
+and integration boundaries are recorded in
+[streamer-capabilities.json](docs/streamer-capabilities.json).
+
+Tailscale can run as a separate ARM64 executable. The tested installation keeps
+its binaries and private identity in `/blackbox/upgrade/osmo-srt/tailscale`;
+`tools/start-camera-tailscale.sh` restarts it without adding a boot hook. Wi-Fi
+must already be connected. Tailscale state survives reboot; runtime processes
+and the temporary Wi-Fi setup do not restart automatically.
+
 面向 DJI Osmo Action 5 Pro（AC204）的自托管 Web 控制台。后端直接运行在相机的 Linux 系统中，通过浏览器管理实时画面、媒体文件、无线网络、进程和系统操作。
 
 > 本项目需要已解锁且启用 **root ADB** 的相机。它不会解锁 Bootloader、开启 ADB 或移除 Factory Mode。

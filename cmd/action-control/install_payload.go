@@ -20,7 +20,7 @@ func unitContent(name string) []byte {
 	if name == NetworkServiceName {
 		return []byte("[Unit]\nDescription=Action Control wireless lifecycle\nAfter=local-fs.target dji_network.service\n\n[Service]\nType=oneshot\nExecStart=" + AppDir + "/action-control network\nRemainAfterExit=yes\nKillMode=control-group\nTimeoutStartSec=300\nTimeoutStopSec=15\nUMask=0077\n\n[Install]\nWantedBy=multi-user.target\n")
 	}
-	return []byte("[Unit]\nDescription=Action Control camera console\nAfter=local-fs.target\n\n[Service]\nType=simple\nExecStart=" + AppDir + "/action-control serve --listen :8080\nRestart=on-failure\nRestartSec=2\nKillMode=control-group\nTimeoutStopSec=15\nUMask=0077\n\n[Install]\nWantedBy=multi-user.target\n")
+	return []byte("[Unit]\nDescription=Action Control camera console\nAfter=local-fs.target\n\n[Service]\nType=simple\nExecStart=" + AppDir + "/action-control serve --listen :8080\nRestart=on-failure\nRestartSec=2\nKillMode=control-group\nTimeoutStopSec=45\nUMask=0077\n\n[Install]\nWantedBy=multi-user.target\n")
 }
 func validateELF(name string) error {
 	file, err := elf.Open(name)
@@ -99,6 +99,35 @@ func readPayload(source string) (payloadManifest, error) {
 		}
 		if err = validateELF(filepath.Join(source, name)); err != nil {
 			return manifest, fmt.Errorf("%s: %w", name, err)
+		}
+	}
+	// The optional streamer uses the stock ARM64 loader and dlopens camera
+	// libraries; it intentionally has a different ABI from the static console.
+	if seen["bin/osmo-stream"] {
+		f, e := elf.Open(filepath.Join(source, "bin/osmo-stream"))
+		if e != nil {
+			return manifest, e
+		}
+		defer f.Close()
+		if f.Class != elf.ELFCLASS64 || f.Machine != elf.EM_AARCH64 {
+			return manifest, errors.New("streamer must be a Linux ARM64 executable")
+		}
+		for _, p := range f.Progs {
+			if p.Type == elf.PT_INTERP {
+				b, e := io.ReadAll(p.Open())
+				if e != nil || strings.TrimRight(string(b), "\x00") != "/lib/ld-linux-aarch64.so.1" {
+					return manifest, errors.New("unexpected streamer loader")
+				}
+			}
+		}
+		libs, e := f.ImportedLibraries()
+		if e != nil {
+			return manifest, e
+		}
+		for _, lib := range libs {
+			if lib != "libdl.so.2" && lib != "libpthread.so.0" && lib != "libc.so.6" {
+				return manifest, errors.New("unexpected streamer link dependency")
+			}
 		}
 	}
 	return manifest, nil

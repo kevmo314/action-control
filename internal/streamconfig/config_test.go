@@ -1,0 +1,81 @@
+package streamconfig
+
+import "testing"
+
+func TestRejectInvalidStreamSettings(t *testing.T) {
+	base := DefaultConfig()
+	base.Address = "[::1]:9000"
+	if err := base.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for name, change := range map[string]func(*Config){
+		"URL instead of address": func(c *Config) { c.Address = "srt://receiver:9000?mode=caller" },
+		"missing port":           func(c *Config) { c.Address = "receiver" },
+		"port out of range":      func(c *Config) { c.Address = "receiver:65536" },
+		"short key":              func(c *Config) { c.Passphrase = "short" },
+		"unbounded latency":      func(c *Config) { c.LatencyMS = 999999 },
+		"unsupported capture":    func(c *Config) { c.Width = 4096 },
+		"pipeline injection":     func(c *Config) { c.AudioSource = "regular0 ! filesink location=/etc/config" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := base
+			change(&c)
+			if c.Validate() == nil {
+				t.Fatal("invalid configuration accepted")
+			}
+		})
+	}
+}
+
+func TestMicrophoneDiscoveryAndSelection(t *testing.T) {
+	fixture := `Source #1
+ State: RUNNING
+ Name: low-latency0.monitor
+ Description: output monitor
+Source #3
+ State: RUNNING
+ Name: regular0
+ Description: internal microphones
+ Sample Specification: s24-32le 4ch 48000Hz
+ Channel Map: front-left,front-right,side-left,side-right
+ Mute: no
+ Active Port: handset-mic
+Source #19
+ State: SUSPENDED
+ Name: source.wireless-mic
+ Description: wireless mic input
+ Sample Specification: s16le 2ch 48000Hz
+ Channel Map: front-left,front-right
+ Mute: yes
+ Active Port: wireless-mic
+`
+	sources := ParseAudioSources(fixture)
+	if len(sources) != 2 {
+		t.Fatalf("monitor included or mic missing: %+v", sources)
+	}
+	if !sources[1].Wireless || !sources[1].Muted || sources[1].ChannelMap != "front-left,front-right" {
+		t.Fatalf("wireless metadata lost: %+v", sources[1])
+	}
+	if selected, err := ResolveAudioSource("auto", sources); err != nil || selected != "source.wireless-mic" {
+		t.Fatalf("auto did not prefer connected DJI mic: %s %v", selected, err)
+	}
+	withGenericBluetooth := append([]AudioSource{{Name: "bluez_source.generic", Wireless: true}}, sources...)
+	if selected, err := ResolveAudioSource("auto", withGenericBluetooth); err != nil || selected != "source.wireless-mic" {
+		t.Fatalf("generic Bluetooth input displaced DJI input: %s %v", selected, err)
+	}
+	if selected, err := ResolveAudioSource("regular0", sources); err != nil || selected != "regular0" {
+		t.Fatalf("explicit selection ignored: %s %v", selected, err)
+	}
+	if selected, err := ResolveAudioSource("auto", sources[:1]); err != nil || selected != "regular0" {
+		t.Fatalf("internal auto selection: %s %v", selected, err)
+	}
+	if _, err := ResolveAudioSource("source.wireless-mic", sources[:1]); err == nil {
+		t.Fatal("disconnected selected mic silently fell back")
+	}
+	if _, err := ResolveAudioSource("auto", nil); err == nil {
+		t.Fatal("missing input accepted")
+	}
+	if selected, err := ResolveAudioSource("none", nil); err != nil || selected != "none" {
+		t.Fatal("video-only mode requires a microphone")
+	}
+}

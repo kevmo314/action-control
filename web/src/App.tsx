@@ -15,6 +15,7 @@ import {
   ListTree,
   Menu,
   PanelLeft,
+  Radio,
   Settings2,
   Wifi,
   X,
@@ -32,6 +33,11 @@ import { OverviewPage } from "./pages/OverviewPage";
 
 const CameraPage = lazy(() =>
   import("./pages/CameraPage").then((page) => ({ default: page.CameraPage })),
+);
+const LivestreamPage = lazy(() =>
+  import("./pages/LivestreamPage").then((page) => ({
+    default: page.LivestreamPage,
+  })),
 );
 const FilesPage = lazy(() =>
   import("./pages/FilesPage").then((page) => ({ default: page.FilesPage })),
@@ -57,6 +63,12 @@ const navigation = [
     page: OverviewPage,
   },
   { id: "camera", name: "Camera", icon: Camera, page: CameraPage },
+  {
+    id: "livestream",
+    name: "Livestreaming",
+    icon: Radio,
+    page: LivestreamPage,
+  },
   { id: "album", name: "Album", icon: Images, page: AlbumPage },
   { id: "files", name: "Files", icon: Folder, page: FilesPage },
   { id: "network", name: "Network", icon: Wifi, page: NetworkPage },
@@ -312,9 +324,8 @@ export function App() {
           ) : health.data?.device === false ? (
             <div className="mb-6">
               <Notice>
-                Local filesystem mode · Files and the web interface are
-                available. Camera, wireless, and system controls are disabled in
-                this mode.
+                Local filesystem mode · Files use a temporary directory.
+                Hardware availability is shown in each section.
               </Notice>
             </div>
           ) : null}

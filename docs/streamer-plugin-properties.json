@@ -1,0 +1,985 @@
+{
+  "inspected_at": "2026-11-04T04:46:18.456153+00:00",
+  "model": "DJI Osmo Action 5 Pro / AC204",
+  "read_only": true,
+  "caveat": "Advertised controls are integration candidates, not verified hardware features. Some vendor tags are absent on this firmware.",
+  "plugins": [
+    {
+      "name": "djiqmmfsrc",
+      "properties": [
+        {
+          "name": "active-sensor-size",
+          "description": "The active pixel array of the camera sensor ('<X, Y, WIDTH, HEIGHT >') and it is filled only when the plugin is in READY or above state",
+          "metadata": [
+            "flags: readable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "GstValueArray of GValues of type \"gint\""
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "adrc",
+          "description": "Automatic Dynamic Range Compression",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Boolean. Default: true"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "antibanding",
+          "description": "Camera antibanding routine for the current illumination condition",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Enum \"GstDjiAntibandingMode\" Default: 3, \"auto\"",
+            "(0): off              - The camera device will not adjust exposure duration to avoid banding problems.",
+            "(1): 50hz             - The camera device will adjust exposure duration to avoid banding problems with 50Hz illumination sources.",
+            "(2): 60hz             - The camera device will adjust exposure duration to avoid banding problems with 60Hz illumination sources.",
+            "(3): auto             - The camera device will automatically adapt its antibanding routine to the current illumination condition."
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "batch-nums",
+          "description": "support config batch nums from frwk",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Integer. Range: 0 - 255 Default: 0"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "camera",
+          "description": "Camera device ID to be used by video/image pads",
+          "metadata": [
+            "flags: readable, writable",
+            "Unsigned Integer. Range: 0 - 10 Default: 0"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "contrast",
+          "description": "Image Contrast Strength",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Integer. Range: 1 - 10 Default: 6"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "control-mode",
+          "description": "Overall mode of 3A (auto-exposure, auto-white-balance, auto-focus) control routines. This is a top-level 3A control switch. When set to OFF, all 3A control by the camera device is disabled.",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Enum \"GstDjiCameraControlMode\" Default: 1, \"auto\"",
+            "(0): off              - Full application control of pipeline.",
+            "(1): auto             - Manual control of capture parameters is disabled.",
+            "(2): use-scene-mode   - Use a specific scene mode.",
+            "(3): off-keep-state   - Same as OFF mode, except that this capture will not be used by camera device background auto-exposure, auto-white balance and auto-focus algorithms (3A) to update their statistics."
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "custom-exposure-table",
+          "description": "A GstStructure describing custom exposure table",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "String. Default: \"org.codeaurora.qcamera3.exposuretable;\""
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "defog-table",
+          "description": "A GstStructure describing defog table",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "String. Default: \"org.quic.camera.defog;\""
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "effect",
+          "description": "Effect applied on the camera frames",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Enum \"GstDjiCameraEffectMode\" Default: 0, \"off\"",
+            "(0): off              - No color effect will be applied.",
+            "(1): mono             - A 'monocolor' effect where the image is mapped into a single color.",
+            "(2): negative         - A 'photo-negative' effect where the image's colors are inverted.",
+            "(3): solarize         - A 'solarisation' effect (Sabattier effect) where the image is wholly or partially reversed in tone.",
+            "(4): sepia            - A 'sepia' effect where the image is mapped into warm gray, red, and brown tones.",
+            "(5): posterize        - A 'posterization' effect where the image uses discrete regions of tone rather than a continuous gradient of tones.",
+            "(6): whiteboard       - A 'whiteboard' effect where the image is typically displayed as regions of white, with black or grey details.",
+            "(7): blackboard       - A 'blackboard' effect where the image is typically displayed as regions of black, with white or grey details.",
+            "(8): aqua             - An 'aqua' effect where a blue hue is added to the image."
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "eis",
+          "description": "Electronic Image Stabilization to reduce the effects of camera shake",
+          "metadata": [
+            "flags: readable, writable",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "eis-algo-params",
+          "description": "Params For EIS Algo ('<frame delay, imu td value>')",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "GstValueArray of GValues of type \"gint\""
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "eis-frame-delay",
+          "description": "eis frame delay for dji eis node",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Integer. Range: 0 - 255 Default: 0"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "enable-fullsize-model",
+          "description": "4k model enable for nn lowlight",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "exposure-compensation",
+          "description": "Adjust (Compensate) camera images target brightness. Adjustment is measured as a count of steps.",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Integer. Range: -24 - 24 Default: 0"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "exposure-lock",
+          "description": "Locks current camera exposure routine values from changing.",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "exposure-metering",
+          "description": "The desired mode for the camera's exposure metering routine.",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Enum \"GstDjiCameraExposureMetering\" Default: 0, \"average\"",
+            "(0): average          - The camera device's exposure metering is calculated as average from the whole frame.",
+            "(1): center-weighted  - The camera device's exposure metering is calculated from the center region of the frame.",
+            "(2): spot             - The camera device's exposure metering is calculated from a chosen spot.",
+            "(6): custom           - The camera device's exposure metering is calculated from a custom metering table."
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "exposure-mode",
+          "description": "The desired mode for the camera's exposure routine.",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Enum \"GstDjiCameraExposureMode\" Default: 1, \"auto\"",
+            "(0): off              - The auto exposure routine is disabled. Manual exposure time will be used set via the 'exposure-time' property",
+            "(1): auto             - The auto exposure routine is active."
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "fast-switch-enable",
+          "description": "Fast Switch",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "fd-mode",
+          "description": "Whether face detect is currently enabled, and in what mode it is.",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Enum \"GstDjiFdMode\" Default: 0, \"fd-off\"",
+            "(0): fd-off           - face detect mode off",
+            "(1): fd-simple        - face detect mode simple",
+            "(2): fd-full          - face detect mode full"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "focus-mode",
+          "description": "Whether auto-focus is currently enabled, and in what mode it is.",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Enum \"GstDjiCameraFocusMode\" Default: 0, \"off\"",
+            "(0): off              - The auto focus routine is disabled.",
+            "(1): auto             - The auto focus routine is active.",
+            "(2): macro            - In this mode, the auto focus algorithm is optimized for focusing on objects very close to the camera.",
+            "(3): continuous       - In this mode, the AF algorithm modifies the lens position continually to attempt to provide a constantly-in-focus image stream.",
+            "(4): edof             - The camera device will produce images with an extended depth of field automatically; no special focusing operations need to be done before taking a picture."
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "frc-mode",
+          "description": "Stream frame rate control mode.",
+          "metadata": [
+            "flags: readable, writable",
+            "Enum \"GstDjiFrcMode\" Default: 2, \"disable-frc\"",
+            "(0): frame-skip       - Control stream frame rate by frame skip",
+            "(1): capture-request  - Control stream frame rate by camera capture request",
+            "(2): disable-frc      - Disable stream frame rate control"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "ife-direct-stream",
+          "description": "IFE direct stream support, with this param, ISP will generateoutput stream from IFE directly and skip others ISP moduleslike IPE",
+          "metadata": [
+            "flags: readable, writable",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "image-metadata",
+          "description": "Settings and parameters used for submitting capture requests for high quality images via the capture-image signal in the form of Android CameraMetadata object. Caller is responsible for releasing the object.",
+          "metadata": [
+            "flags: readable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Pointer."
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "infrared-mode",
+          "description": "Infrared Mode",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Enum \"GstDjiCameraIRMode\" Default: 0, \"off\"",
+            "(0): off              - The infrared LED is OFF and cut filter is applied i.e. infrared light is blocked.",
+            "(1): on               - The infrared LED is ON and cut filter is removed i.e. infrared light is allowed.",
+            "(2): auto             - The infrared LED and cut filter are turned ON or OFF dependingon the conditions.",
+            "(3): cut-filter-only  - The infrared LED is turned OFF and cut filter is applied i.e. IR light is blocked.",
+            "(4): cut-filter-disable - Infrared cut filter is removed allowing IR light to pass. This mode is used for transitioning from 'cut-filter-only' mode i.e. disabling only the cut filter."
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "input-roi-enable",
+          "description": "Input ROI if enabled, Input ROI reprocess usecase will be selected",
+          "metadata": [
+            "flags: readable, writable",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "input-roi-info",
+          "description": "Applicable only if input-roi-enable property is set.input-roi-info is array for each roi ('<X1, Y1, WIDTH1, HEIGHT1 X2, Y2, WIDTH2, HEIGHT2, ...>') it needs to be filled for the no. of Input ROI's in playing state",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "GstValueArray of GValues of type \"gint\""
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "iso-mode",
+          "description": "ISO exposure mode",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Enum \"GstDjiCameraISOMode\" Default: 0, \"auto\"",
+            "(0): auto             - The ISO exposure mode will be chosen depending on the scene.",
+            "(1): deblur           - The ISO exposure sensitivity set to prioritize motion deblur.",
+            "(2): 100              - The ISO exposure sensitivity set to prioritize level 100.",
+            "(3): 200              - The ISO exposure sensitivity set to prioritize level 200.",
+            "(4): 400              - The ISO exposure sensitivity set to prioritize level 400.",
+            "(5): 800              - The ISO exposure sensitivity set to prioritize level 800.",
+            "(6): 1600             - The ISO exposure sensitivity set to prioritize level 1600.",
+            "(7): 3200             - The ISO exposure sensitivity set to prioritize level 3200.",
+            "(8): manual           - The ISO exposure value provided by manual-iso-value will be used."
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "lcac",
+          "description": "Lateral Chromatic Aberration Correction",
+          "metadata": [
+            "flags: readable, writable",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "ldc",
+          "description": "Lens Distortion Correction",
+          "metadata": [
+            "flags: readable, writable",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "lowpower-lv-enable",
+          "description": "Lowpower Liveview",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "ltm-data",
+          "description": "A GstStructure describing local tone mapping data",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "String. Default: \"org.quic.camera.ltmDynamicContrast;\""
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "manual-exposure-time",
+          "description": "Manual exposure time in nanoseconds. Used when the Exposure mode is set to 'off'.",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Integer64. Range: 0 - 9223372036854775807 Default: 33333333"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "manual-iso-value",
+          "description": "Manual exposure ISO value. Used when the ISO mode is set to 'manual'",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Integer. Range: 100 - 51200 Default: 800"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "manual-wb-settings",
+          "description": "Manual White Balance settings such as color correction temperature and R/G/B gains. Used in manual white balance modes.",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "String. Default: \"org.codeaurora.qcamera3.manualWB;\""
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "max-hal-requests",
+          "description": "support config max hal requests from frwk",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Integer. Range: 0 - 255 Default: 0"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "name",
+          "description": "The name of the object",
+          "metadata": [
+            "flags: readable, writable, 0x2000",
+            "String. Default: \"djiqmmfsrc0\""
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "noise-reduction",
+          "description": "Noise reduction filter mode",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Enum \"GstDjiCameraNoiseReduction\" Default: 1, \"fast\"",
+            "(0): off              - No noise reduction filter is applied.",
+            "(1): fast             - TNR (Temoral Noise Reduction) Fast Mode.",
+            "(2): hq               - TNR (Temoral Noise Reduction) High Quality Mode."
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "noise-reduction-tuning",
+          "description": "A GstStructure describing noise reduction tuning",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "String. Default: \"org.quic.camera.anr_tuning;\""
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "op-mode",
+          "description": "provide camera operation mode to support specified camera function support mode : none | frameselection by default camera operation mode is none.",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Enum \"GstFrameSelection\" Default: 0, \"none\"",
+            "(0): none             - Normal Camera Operation Mode",
+            "(1): frameselection   - Camera Operation Mode Frame Selection",
+            "(2): slow-motion      - Camera Operation Mode Frame Selection",
+            "(3): smart-track      - Camera Operation Mode Frame Selection",
+            "(5): timelapse        - Camera Operation Mode Frame Selection",
+            "(4): fastswitch       - Camera Operation Mode Fast Switch",
+            "(6): lowlight         - Camera Operation Mode Nn LowLight",
+            "(7): uvc              - Camera Operation Mode UVC",
+            "(8): dp               - Camera Operation Mode DP"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "parent",
+          "description": "The parent of the object",
+          "metadata": [
+            "flags: readable, writable, 0x2000",
+            "Object of type \"GstObject\""
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "partial-meta-enable",
+          "description": "if partial meta is enabled, then it can be passed to frwk once produced.",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "pick-sensormode",
+          "description": "Use LSB 2 bytes to controll low power and formal sensormode",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Integer. Range: 0 - 65535 Default: 0"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "resume-status",
+          "description": "resume status for dji eis node",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Integer. Range: 0 - 255 Default: 0"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "saturation",
+          "description": "Image Saturation Strength",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Integer. Range: 0 - 10 Default: 5"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "scene",
+          "description": "Camera optimizations depending on the scene",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Enum \"GstDjiCameraSceneMode\" Default: 1, \"face-priority\"",
+            "(0): disabled         - Indicates that no scene modes are set.",
+            "(1): face-priority    - Optimized for photos of with priority of people faces.",
+            "(2): action           - Optimized for photos of quickly moving objects.",
+            "(3): portrait         - Optimized for still photos of people.",
+            "(4): landscape        - Optimized for photos of distant macroscopic objects.",
+            "(5): night            - Optimized for low-light settings.",
+            "(6): night-portrait   - Optimized for still photos of people in low-light settings.",
+            "(7): theatre          - Optimized for dim, indoor settings where flash must remain off.",
+            "(8): beach            - Optimized for bright, outdoor beach settings.",
+            "(9): snow             - Optimized for bright, outdoor settings containing snow.",
+            "(10): sunset           - Optimized for scenes of the setting sun.",
+            "(11): steady-photo     - Optimized to avoid blurry photos due to small amounts of device motion (for example: due to hand shake).",
+            "(12): fireworks        - Optimized for nighttime photos of fireworks.",
+            "(13): sports           - Optimized for photos of quickly moving people.",
+            "(14): party            - Optimized for dim, indoor settings with multiple moving people.",
+            "(15): candlelight      - Optimized for dim settings where the main light source is a candle.",
+            "(16): hdr              - Turn on a device-specific high dynamic range (HDR) mode."
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "sensor-mode",
+          "description": "Force set Sensor Mode index (0-15). -1 for Auto selection",
+          "metadata": [
+            "flags: readable, writable",
+            "Integer. Range: -1 - 15 Default: -1"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "session-metadata",
+          "description": "Settings parameters used for configure stream as AndroidCameraMetadata object. Caller is responsible for releasing the object.",
+          "metadata": [
+            "flags: writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Pointer. Write only"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "sharpness",
+          "description": "Image Sharpness Strength",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Integer. Range: 0 - 6 Default: 2"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "shdr",
+          "description": "Super High Dynamic Range Imaging",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "shdr-enable",
+          "description": "Video shdr",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "simu-active-strm-enable",
+          "description": "if SIMU AVTICE  meta is enabled, then it can support simultaneous start stream .",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "slave",
+          "description": "Set camera as slave device",
+          "metadata": [
+            "flags: readable, writable",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "static-metadata",
+          "description": "Supported camera capabilities as Android CameraMetadata object. Caller is responsible for releasing the object.",
+          "metadata": [
+            "flags: readable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Pointer."
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "video-metadata",
+          "description": "Settings and parameters used for submitting capture requests for video streams in the form of Android CameraMetadata object. Caller is responsible for releasing the object.",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Pointer."
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "video-skip-thr",
+          "description": "if DEFAULT_VIDEO_SKIP_THR  meta is enabled, then it can support skip frame .",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Integer. Range: 0 - 255 Default: 0"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "video-yltm-enable",
+          "description": "Video YLTM",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "viull-enable",
+          "description": "Video Ultra Low Light",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "white-balance-lock",
+          "description": "Locks current White Balance values from changing. Affects only non-manual white balance modes.",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "white-balance-mode",
+          "description": "The desired mode for the camera's white balance routine.",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Enum \"GstDjiCameraWiteBalanceMode\" Default: 3, \"auto\"",
+            "(0): off              - Both auto and manual white balance routines are disabled.",
+            "(1): manual-cc-temp   - The auto-white balance routine is inactive and manual color correction temperature is used which is set via the 'manual-wb-settings' property.",
+            "(2): manual-rgb-gains - The auto-white balance routine is inactive and manual R/G/B gains are used which are set via the 'manual-wb-settings' property.",
+            "(3): auto             - The auto-white balance routine is active.",
+            "(4): shade            - The camera device uses shade light as the assumed scene illumination for white balance correction.",
+            "(5): incandescent     - The camera device uses incandescent light as the assumed scene illumination for white balance correction.",
+            "(6): fluorescent      - The camera device uses fluorescent light as the assumed scene illumination for white balance correction.",
+            "(7): warm-fluorescent - The camera device uses warm fluorescent light as the assumed scene illumination for white balance correction.",
+            "(8): daylight         - The camera device uses daylight light as the assumed scene illumination for white balance correction.",
+            "(9): cloudy-daylight  - The camera device uses cloudy daylight light as the assumed scene illumination for white balance correction.",
+            "(10): twilight         - The camera device uses twilight light as the assumed scene illumination for white balance correction."
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "zoom",
+          "description": "Camera zoom rectangle ('<X, Y, WIDTH, HEIGHT >') in sensor active pixel array coordinates",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "GstValueArray of GValues of type \"gint\""
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        }
+      ]
+    },
+    {
+      "name": "djicamc2venc",
+      "properties": [
+        {
+          "name": "b-frames",
+          "description": "Number of B-frames between two consecutive I-frames (0xffffffff=component default)",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 4294967295"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "control-rate",
+          "description": "Bitrate control method",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Enum \"GstDjiC2RateControl\" Default: 0, \"disable\"",
+            "(0): disable          - Disable bitrate control",
+            "(1): constant         - Constant bitrate",
+            "(2): CBR-VFR          - Constant bitrate, variable framerate",
+            "(3): VBR-CFR          - Variable bitrate, constant framerate",
+            "(4): VBR-VFR          - Variable bitrate, variable framerate",
+            "(5): CQ               - Constant quality"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "delivery-mode",
+          "description": "Delivery mode, deliver sliced output per buffer",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 0"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "enable-per-frame-log",
+          "description": "control per frame log to save power and cpu loading",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 0"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "entropy-mode",
+          "description": "Entropy mode (0xffffffff=component default)",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Enum \"GstDjiC2EntropyMode\" Default: -1, \"default\"",
+            "(0): cavlc            - CAVLC",
+            "(1): cabac            - CABAC",
+            "(-1): default          - Component Default"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "fixed-fps",
+          "description": "Timelapse need to set fixed-fps to change pts",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 0"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "fixed-operating-rate",
+          "description": "fixed-operating-rate when encoder started",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 0"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "idr-interval",
+          "description": "Periodicity of IDR frames. When set to 0 all frames will be I frames (0xffffffff=component default)",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 4294967295"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "intra-refresh-mode",
+          "description": "Intra refresh mode (0xffffffff=component default).Allow IR only for CBR(_CFR/VFR) RC modes",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Enum \"GstDjiC2IntraRefresh\" Default: -1, \"default\"",
+            "(0): disable          - No intra resfresh",
+            "(1): arbitrary        - Arbitrary",
+            "(2): cyclic           - Cyclic",
+            "(-1): default          - Component Default"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "intra-refresh-period",
+          "description": "The period of intra refresh. Only support random mode.",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 0"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "loop-filter-mode",
+          "description": "Deblocking filter mode (0xffffffff=component default)",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Enum \"GstDjiC2LoopFilterMode\" Default: -1, \"default\"",
+            "(0): enable           - Enable",
+            "(1): disable          - Disable",
+            "(2): disable-slice-boundary - Disable-slice-boundary",
+            "(-1): default          - Component Default"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "max-quant-b-frames",
+          "description": "Maximum quantization parameter allowed for B-frames",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 51"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "max-quant-i-frames",
+          "description": "Maximum quantization parameter allowed for I-frames",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 51"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "max-quant-p-frames",
+          "description": "Maximum quantization parameter allowed for P-frames",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 51"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "min-force-key-unit-interval",
+          "description": "Minimum interval between force-keyunit requests in nanoseconds",
+          "metadata": [
+            "flags: readable, writable",
+            "Unsigned Integer64. Range: 0 - 18446744073709551615 Default: 0"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "min-quant-b-frames",
+          "description": "Minimum quantization parameter allowed for B-frames",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 10"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "min-quant-i-frames",
+          "description": "Minimum quantization parameter allowed for I-frames",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 10"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "min-quant-p-frames",
+          "description": "Minimum quantization parameter allowed for P-frames",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 10"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "nal-length-bit-stream",
+          "description": "nal-length-bit-stream (0x0=component default)",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 0"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "name",
+          "description": "The name of the object",
+          "metadata": [
+            "flags: readable, writable, 0x2000",
+            "String. Default: \"djic2vencoder0\""
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "num-ltr-frames",
+          "description": "Number of Long Term Reference Frames (0xffffffff=component default)",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 4294967295"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "parent",
+          "description": "The parent of the object",
+          "metadata": [
+            "flags: readable, writable, 0x2000",
+            "Object of type \"GstObject\""
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "priority",
+          "description": "The proirity of current video instance among concurrent cases,(0xffffffff=component default)",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Integer. Range: -2147483648 - 2147483647 Default: -1"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "qos",
+          "description": "Handle Quality-of-Service events from downstream",
+          "metadata": [
+            "flags: readable, writable",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "quant-b-frames",
+          "description": "Quantization parameter for B-frames (0xffffffff=component default)",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 4294967295"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "quant-i-frames",
+          "description": "Quantization parameter for I-frames (0xffffffff=component default)",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 4294967295"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "quant-p-frames",
+          "description": "Quantization parameter for P-frames (0xffffffff=component default)",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 4294967295"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "roi-quant-boxes",
+          "description": "Manually set ROI boxes (e.g. '<<X, Y, W, H, QP>, <X, Y, W, H, QP>>'). The QP values must be in the range of -31 (best quality) to 30 (worst quality)",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "GstValueArray of GValues of type \"GstValueArray\""
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "roi-quant-meta-value",
+          "description": "Set specific QP value, different then the default value of (-15), for a GstVideoRegionOfInterestMeta type (e.g. 'roi-meta-qp,person=-20,cup=10,dog=-5;'). The QP values must be in the range of -31 (best quality) to 30 (worst quality)",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Boxed pointer of type \"GstStructure\""
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "roi-quant-mode",
+          "description": "Enable/Disable Adjustment of the quantization parameter according to ROIs set manually via the 'roi-quant-boxes' property and/or arriving as GstVideoRegionOfInterestMeta attached to the buffer",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Boolean. Default: false"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "rotate",
+          "description": "Rotate video image",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Enum \"GstDjiC2VideoRotation\" Default: 0, \"none\"",
+            "(0): none             - No rotation",
+            "(1): 90CW             - Rotate 90 degrees clockwise",
+            "(3): 90CCW            - Rotate 90 degrees counter-clockwise",
+            "(2): 180              - Rotate 180 degrees"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "slice-mode",
+          "description": "Slice mode (0xffffffff=component default)",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Enum \"GstDjiC2SliceMode\" Default: -1, \"default\"",
+            "(0): MB               - Megabytes slice mode",
+            "(1): bytes            - Bytes slice mode",
+            "(-1): default          - Component Default"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "slice-size",
+          "description": "Slice size, just set when slice mode setting to MB or Bytes",
+          "metadata": [
+            "flags: readable, writable, changeable only in NULL or READY state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 0"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        },
+        {
+          "name": "target-bitrate",
+          "description": "Target bitrate in bits per second (0xffffffff=component default)",
+          "metadata": [
+            "flags: readable, writable, changeable in NULL, READY, PAUSED or PLAYING state",
+            "Unsigned Integer. Range: 0 - 4294967295 Default: 4294967295"
+          ],
+          "evidence": "advertised_by_installed_plugin"
+        }
+      ]
+    }
+  ]
+}

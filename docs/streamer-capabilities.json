@@ -1,0 +1,200 @@
+{
+  "model": "DJI Osmo Action 5 Pro / AC204",
+  "inspected_date": "2026-11-04",
+  "evidence_levels": {
+    "working": "Device capture or protocol tested; see limits.",
+    "advertised": "Installed plugin exposes a control; image effect and sensor-mode support unverified.",
+    "native_abi": "Exported native code or binary disassembly identifies a route; struct layouts/lifecycle need work."
+  },
+  "working": [
+    "Independent raw sensor capture and Codec2 H.265 at 1280x720 around 30 fps",
+    "Stereo AAC-LC at 48 kHz from internal PulseAudio regular0",
+    "SRT caller transport with web start/stop and native camera restoration",
+    "Native wireless mic create/get_capability/get_status/destroy: rc=0; two TX connection flags both 0"
+  ],
+  "options": [
+    {
+      "feature": "Exposure and white balance",
+      "evidence": "advertised",
+      "route": "djiqmmfsrc",
+      "controls": [
+        "exposure-lock",
+        "exposure-mode",
+        "manual-exposure-time",
+        "exposure-compensation",
+        "exposure-metering",
+        "iso-mode",
+        "manual-iso-value",
+        "antibanding",
+        "white-balance-lock",
+        "white-balance-mode",
+        "manual-wb-settings"
+      ],
+      "options": "Auto/manual shutter; advertised ISO 100–51200; compensation -24..24 steps; 50/60 Hz/auto anti-flicker; WB presets/lock/manual temperature or RGB gains.",
+      "boundary": "The plugin says control-mode=auto disables manual capture parameters. Validate each setting together with control-mode. Manual WB is a vendor structure needing field verification. Exposure steps are not assumed to equal EV."
+    },
+    {
+      "feature": "Image appearance",
+      "evidence": "advertised",
+      "route": "djiqmmfsrc",
+      "controls": [
+        "contrast",
+        "saturation",
+        "sharpness",
+        "noise-reduction",
+        "adrc"
+      ],
+      "options": "Contrast 1–10, saturation 0–10, sharpness 0–6, NR off/fast/hq, dynamic-range compression on/off.",
+      "boundary": "Test the actual image effect and latency on AC204; metadata alone is not proof."
+    },
+    {
+      "feature": "Stabilization and lens correction",
+      "evidence": "advertised",
+      "route": "djiqmmfsrc",
+      "controls": [
+        "eis",
+        "eis-frame-delay",
+        "eis-algo-params",
+        "ldc",
+        "lcac",
+        "zoom",
+        "active-sensor-size"
+      ],
+      "options": "EIS, distortion/chromatic correction, sensor-coordinate zoom rectangle.",
+      "boundary": "EIS has IMU/time-delay inputs; do not equate one boolean with full RockSteady/Horizon modes. Zoom needs actual active sensor bounds. The pad crop property is documented only for JPEG/YUY2, not the NV12 stream currently used."
+    },
+    {
+      "feature": "Encoder and adaptive bitrate",
+      "evidence": "advertised",
+      "route": "djicamc2venc",
+      "controls": [
+        "target-bitrate",
+        "control-rate",
+        "idr-interval",
+        "intra-refresh-mode",
+        "intra-refresh-period",
+        "b-frames",
+        "rotate",
+        "roi-quant-mode",
+        "roi-quant-boxes"
+      ],
+      "actions": [
+        "trigger-iframe",
+        "query-outbuf-cnt",
+        "query-inbuf-cnt"
+      ],
+      "options": "Live target bitrate and IDR interval changes; CBR/VBR/CQ presets; keyframe requests; cyclic refresh under CBR; rotation and static quality-priority regions.",
+      "boundary": "The plugin marks target-bitrate/idr-interval mutable in PLAYING, but most other settings require NULL/READY. Hardware reactions to runtime changes have not been tested."
+    },
+    {
+      "feature": "10-bit, HDR and low light",
+      "evidence": "advertised",
+      "route": "djiqmmfsrc + djicamc2venc",
+      "controls": [
+        "shdr",
+        "shdr-enable",
+        "viull-enable",
+        "video-yltm-enable",
+        "enable-fullsize-model",
+        "op-mode"
+      ],
+      "formats": [
+        "NV12",
+        "NV12_10LE32",
+        "P010_10LE"
+      ],
+      "options": "10-bit frame formats, HDR and neural low-light paths are advertised.",
+      "boundary": "No verified D-Log mode, HDR transfer function, Main10 negotiation, 4K/fps matrix, or acceptable processing latency yet. Shared APIs may include capabilities unsupported by this model."
+    },
+    {
+      "feature": "DJI internal microphone processing",
+      "evidence": "native_abi",
+      "libraries": [
+        "libdcam_audio_frwk.so",
+        "libapuapi.so",
+        "libadev_interface.so",
+        "libAACenc.so"
+      ],
+      "functions": [
+        "dji_apu_open",
+        "dji_apu_capture_handle",
+        "dji_apu_capture_wns",
+        "dji_apu_set_module_params",
+        "dji_apu_close"
+      ],
+      "options": "Binary diagnostics name wind-noise reduction (including enhanced NN mode), ALC, AGC, noise controls, focus/zoom-aware processing and sample-level calculation. Native AAC uses the aacEnc* API in libAACenc.so.",
+      "boundary": "Current internal audio is PulseAudio PCM converted to stereo and encoded with avenc_aac. It does not reuse DJI APU processing. APU parameter structs, buffer ownership, model loading and standalone lifetime must be decoded before integration."
+    },
+    {
+      "feature": "DJI wireless mic dashboard and controls",
+      "evidence": "native_abi",
+      "libraries": [
+        "libwirelessmicclient.so",
+        "libwirelessmicservice.so",
+        "module-wireless-mic-detect.so",
+        "module-wireless-mic-source.so"
+      ],
+      "pulse_source": "source.wireless-mic",
+      "functions": [
+        "wireless_mic_client_get_capability",
+        "wireless_mic_client_get_status",
+        "wireless_mic_client_get_tx_user_setting_status",
+        "wireless_mic_client_set_tx_in_gain",
+        "wireless_mic_client_set_tx_mute",
+        "wireless_mic_client_set_tx_lowcut",
+        "wireless_mic_client_set_tx_highcut",
+        "wireless_mic_client_set_tx_denoise",
+        "wireless_mic_client_set_tx_denoise_level",
+        "wireless_mic_client_set_channel_mode",
+        "wireless_mic_client_set_tx_record",
+        "wireless_mic_client_set_record_auto_rec"
+      ],
+      "options": "Two-transmitter connection state; service code also contains battery/charging, RSSI, per-TX sample-level calculations, gain bounds/steps, mute, low/high cut, denoise, channel mapping, transmitter backup recording and auto-record.",
+      "boundary": "Only native read-only capability/status lifecycle and two disconnected TX flags have been verified. Battery/RSSI/level fields and notification masks need full ABI mapping; setters and live wireless capture need connected hardware. Do not guess mic-specific gain limits."
+    },
+    {
+      "feature": "Telemetry and stream adaptation",
+      "evidence": "working",
+      "route": "GoSRT statistics plus Linux sysfs",
+      "options": "RTT, retransmits, packet loss/drop counts, sender queue occupancy, sent bytes; Linux battery and thermal sensors; feed live encoder bitrate and keyframe controls.",
+      "boundary": "SRT statistics API is available; only sent-byte reporting is currently integrated. Thermal sensor selection and a stable adaptation policy need validation. Do not infer end-to-end playback or lip-sync solely from send counters."
+    },
+    {
+      "feature": "Per-frame metadata and smart features",
+      "evidence": "advertised",
+      "route": "djiqmmfsrc",
+      "signals": [
+        "result-metadata",
+        "urgent-metadata"
+      ],
+      "controls": [
+        "video-metadata",
+        "static-metadata",
+        "fd-mode",
+        "op-mode"
+      ],
+      "options": "Candidate capture-setting telemetry, face ROI data and smart-track mode.",
+      "boundary": "Android/Qualcomm metadata layouts, vendor tags and model-specific support need mapping. Missing IR/crop/multicam tags were logged even though generic properties exist; avoid exposing every shared-library export as a working AC204 feature."
+    }
+  ],
+  "sync": {
+    "short_srt_start_delta_ms": 15,
+    "local_30s_start_delta_ms": 7.089,
+    "local_30s_end_delta_ms": -4.366,
+    "buffered_srt_run_seconds": 65,
+    "buffered_srt_start_delta_ms": 29.611,
+    "interpretation": "Timestamp alignment only. Physical lip-sync, long-term drift and DJI wireless buffering need an audible/visible reference test. Receiver shutdown tail truncation is excluded from drift conclusions."
+  },
+  "sources": {
+    "capture_properties": "streamer-plugin-properties.json",
+    "native_wireless_probe": "../tools/probe-wireless-mic.py"
+  },
+  "not_implemented": [
+    "EIS/RockSteady/Horizon presets",
+    "DJI APU audio processing",
+    "Wireless mic UI telemetry/control setters",
+    "D-Log/HDR/Main10 presets",
+    "Adaptive bitrate policy",
+    "Hardware-calibrated per-microphone A/V offsets"
+  ]
+}

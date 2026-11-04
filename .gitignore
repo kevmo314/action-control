@@ -2,6 +2,7 @@
 /.build-tools/
 /tools/__pycache__/
 /release/
+/build/
 /media/bin/
 /media/sources/
 /web/node_modules/
