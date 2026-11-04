@@ -13,6 +13,8 @@ static int32_t capture(MetadataInfo *info) {
 }
 static uint8_t fake_mode, fake_current;
 static int have_mode=1,have_current=1;
+static int interface_calls;
+static void forward_interface(void *api) {(void)api;++interface_calls;}
 static int32_t forward(void *request) {(void)request;return 42;}
 static void *metadata(uint64_t request,uint32_t tag,uint32_t type,void *api,void *session,uint32_t camera) {
     assert(type==2 && api==interface_copy && session==expected_session && camera==0);
@@ -20,6 +22,14 @@ static void *metadata(uint64_t request,uint32_t tag,uint32_t type,void *api,void
     assert(tag==ROTATION_TAG && request==0);return have_current?&fake_current:NULL;
 }
 int main(void) {
+    unsigned char api[512]={0};uint32_t api_size=40;
+    original_interface=forward_interface;
+    memcpy(api,&api_size,sizeof(api_size));set_interface(api);
+    assert(interface_calls==1 && !atomic_load(&interface_ready));
+    api_size=384;memcpy(api,&api_size,sizeof(api_size));set_interface(api);
+    assert(interface_calls==2 && atomic_load(&interface_ready));
+    assert(!memcmp(interface_copy,api,384));
+    atomic_store(&interface_ready,0);
     for(uint8_t value=0;value<=1;value++) {
         expected_value=value;
         assert(publish_rotation(capture,expected_session,value)==7);

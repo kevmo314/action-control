@@ -16,6 +16,8 @@
 #define ORIGINAL_HASH "c14c9d440dc2a006503d4b3a0807b5ba4d3ee43a40edeb8d6e6f8fd13dbb8c14"
 #define CAMERA_HAL "/usr/lib/hw/camera.qcom.so"
 #define CAMERA_HAL_HASH "0439c2b5cc867ec914bc16d8ce85a49f6b849822abae780fae149133b3bb5953"
+#define NODE_UTILS "/usr/lib/libcom.qti.chinodeutils.so"
+#define NODE_UTILS_HASH "00df8ce9ae1ca9b5f3a13396515ad9e5fa022ee9cf63b22fc84a628868ba6572"
 #define STEADY_TAG 0x88b7001au
 #define ROTATION_TAG 0x84b70020u
 
@@ -84,13 +86,17 @@ static void load_original(void) {
     if(ac_sha256_file(CAMERA_HAL,hash) || strcmp(hash,CAMERA_HAL_HASH)) {
         fprintf(stderr,"osmo-eis-rotation: HAL fingerprint rejected; stock callbacks retained\n");return;
     }
+    if(ac_sha256_file(NODE_UTILS,hash) || strcmp(hash,NODE_UTILS_HASH)) {
+        fprintf(stderr,"osmo-eis-rotation: node utility fingerprint rejected; stock callbacks retained\n");return;
+    }
     symbol=dlsym(library,"_ZN12ChiNodeUtils11GetMetaDataEmj15ChiMetadataTypeP16ChiNodeInterfacePvj");
     memcpy(&get_metadata,&symbol,sizeof(symbol));
 }
 
 static void set_interface(void *api) {
     original_interface(api);
-    if(!api || u32(api,0)<40 || u32(api,0)>sizeof(interface_copy))return;
+    /* The inspected stock SetNodeInterface rejects tables smaller than 384. */
+    if(!api || u32(api,0)<384 || u32(api,0)>sizeof(interface_copy))return;
     pthread_mutex_lock(&setup_lock);
     if(!atomic_load_explicit(&interface_ready,memory_order_relaxed)) {
         memcpy(interface_copy,api,u32(api,0));

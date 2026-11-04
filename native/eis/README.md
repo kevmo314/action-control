@@ -17,7 +17,8 @@ The original preview module must be copied to
 `/run/action-control-eis-rotation/original-eis-preview.so` before loading the
 adapter. Its complete SHA-256 must match the inspected AC204 firmware. No vendor
 binary is included here. The camera HAL is also fingerprinted because it assigns
-the private vendor tag IDs; a mismatched HAL retains stock callbacks. The wrapper
+the private vendor tag IDs. The native metadata helper is fingerprinted too;
+a mismatch retains stock callbacks. The wrapper
 only replaces the `ProcessRequest` and
 `SetNodeInterface` callbacks; all other original callbacks remain intact.
 
@@ -29,6 +30,7 @@ ABI evidence comes from `ChiNodeEntry`, `DjiEISNodeProcRequest`,
 - request minimum 104 bytes; node pointer at 8 and frame number at 16;
 - inspected node's framework session pointer at offset 48;
 - metadata getter and setter use CHI's native interface; setter at offset 32;
+- interface tables must be at least 384 bytes, as required by stock initialization;
 - input steady tag `0x88b7001a`; usecase rotation tag `0x84b70020`;
 - native tag-data and metadata-info structs are 48 and 56 bytes, respectively.
 
@@ -77,3 +79,8 @@ the override (for example, `systemd-run --unit=osmo-eis-trial-rollback
 /run/action-control-eis-rotation/rollback_trial.py --apply`). Check that the
 timer is active before touching the service configuration. The adapter and
 factory smoke check alone do not schedule this timer.
+
+`metadata_smoke.py` separately checks the real camera-side native metadata
+getter using a fake framework callback. It verifies the 56/48-byte layouts,
+session, frame, metadata type, vendor tag, camera ID and returned data pointer.
+This check passed without opening a capture graph or changing services.

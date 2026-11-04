@@ -217,3 +217,33 @@ The next work is to understand the native video-request metadata and usecase
 rotation/gravity path before changing production capture. Overlay composition
 must remain downstream of the corrected camera output. The reverted software
 rotation experiment is not part of the implementation.
+
+### Rotation consumer and initialization gates
+
+Further offline inspection of the fingerprinted HAL found two separate gates:
+
+- `CamX::IPENode::ConfigureEISRotationEnable` (`0xd15b60`) runs during
+  `ProcessingNodeInitialize`. It reads `IsNormalVideo` with the static metadata
+  mask, checks stabilization bit 2, video width at most 2688, height at most
+  1512, and FPS at most 120. When those checks pass it enables both EIS rotation
+  and dynamic rotation control. These are internal video dimensions, before
+  the custom streamer's final scaling. Our configured 2560×1440, 30 fps fits
+  those numeric checks; this does not prove the other gates pass at runtime.
+- `CamX::IPENode::GetlEisRotationEnableInfo` (`0xd2c740`) reads
+  `EnableIPEEisRotate` from the usecase pool during frame processing. It applies
+  that flag only if dynamic rotation control was enabled during initialization.
+  Publishing the per-frame flag cannot bypass an unsuccessful startup gate.
+
+The HAL vendor table defines `IsNormalVideo` as BYTE/count-1 at `0x80b7003a`.
+The inspected override's `InitializeOverrideSession` computes it around
+`0x18e92c`–`0x18eadc` and writes it into camera metadata. The classification
+depends on operation mode and other configuration state. We have not yet read
+the effective classification or IPE enable state for the custom capture graph;
+do not substitute the requested EIS mode as proof of either.
+
+The experimental adapter and controlled trial are described in
+[`native/eis/README.md`](../native/eis/README.md). Native callback-factory and
+metadata-helper smoke checks pass in isolated processes on the camera, and
+host tests cover mode mapping, ABI layout and recovery. None of those checks
+establish correct horizon behavior. The adapter remains outside the running
+QMMF service until the user approves the required service restart and rollback.
