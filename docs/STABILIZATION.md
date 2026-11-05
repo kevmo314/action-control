@@ -246,4 +246,27 @@ The experimental adapter and controlled trial are described in
 metadata-helper smoke checks pass in isolated processes on the camera, and
 host tests cover mode mapping, ABI layout and recovery. None of those checks
 establish correct horizon behavior. The adapter remains outside the running
-QMMF service until the user approves the required service restart and rollback.
+QMMF service except during an explicitly approved, bounded trial.
+
+### November 5 approved native adapter trial
+
+The first real QMMF adapter trial completed and restored stock services. DJI's
+metadata setter returned success for the usecase rotation flag, but the local
+production-streamer capture still showed an upside-down camera image and an
+upright browser overlay. A 12-second bounded run yielded 200 HEVC frames at
+1280×720 over 6.676 seconds (startup is included in the run limit); a complete
+sequential FFmpeg decode with `-xerror` passed. This rules out an obvious
+metadata-write rejection but does not establish that IPE's rotation gate was
+enabled, or that preview smoothing implements the recording path's gravity
+correction.
+
+Mode 0/3 publications with opposite rotation flags were interleaved in the
+adapter log. Without session/node identities this is not proof of a shared-pool
+race. Native gate logs were not retained for the capture PID; the available
+logcat ring had already moved past the trial. A follow-up diagnostic should
+collect those messages live and identify sessions before changing mode policy.
+
+Native status and video settings matched the saved preflight after recovery.
+QMMF and camera services are back on the stock module, both GUI PIDs stayed the
+same, the boot ID did not change, and the temporary override/timer are inactive.
+The adapter is not enabled persistently and is not a validated stabilization fix.

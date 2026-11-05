@@ -1,8 +1,9 @@
 # Experimental preview rotation metadata adapter
 
 This is a proposed native fix for the custom stream's HorizonSteady orientation
-failure. It is not installed by Action Control and has not yet been tested in
-QMMF's real capture pipeline. It does not flip pixels or choose a fixed angle.
+failure. It is not installed by Action Control. A bounded QMMF capture trial
+accepted its metadata writes but still produced an upside-down camera picture.
+It does not flip pixels or choose a fixed angle.
 
 DJI's recording node publishes `com.dji.camera.EnableIPEEisRotate` into CHI's
 usecase pool for steady modes 3 and 6. The preview node does not publish that
@@ -10,8 +11,8 @@ flag. This adapter forwards the stock preview module's callbacks and mirrors
 that publication before processing a preview request. It reads the actual
 requested EIS mode; modes 3/6 enable native IPE rotation, modes 0/2/5 disable it.
 Unknown/missing modes pass through unchanged. Existing matching flags do not
-produce another write. It is still unproven that this publication alone makes
-the preview output follow the horizon correctly.
+produce another write. Publication alone did not correct the preview in the
+tested graph; this is an investigation tool, not a working HorizonSteady fix.
 
 The original preview module must be copied to
 `/run/action-control-eis-rotation/original-eis-preview.so` before loading the
@@ -79,6 +80,22 @@ the override (for example, `systemd-run --unit=osmo-eis-trial-rollback
 /run/action-control-eis-rotation/rollback_trial.py --apply`). Check that the
 timer is active before touching the service configuration. The adapter and
 factory smoke check alone do not schedule this timer.
+
+The November 5 approved live trial used the production `osmo-stream` capture
+path for a 12-second bounded run, saving local HEVC/MPEG-TS instead of sending
+SRT. It produced 200 decoded 1280×720 frames over 6.676 seconds, with the existing
+browser overlay after stabilization. The camera remained upside down and the
+overlay upright. Flag publications returned zero (success), including requests
+for modes 0 and 3 with opposite values. The current logs lack session/node IDs,
+so they do not establish whether those requests shared a usecase pool. Do not
+infer that their interleaving caused the failure.
+
+The independent recovery timer was armed before activation. The trial restored
+the stock QMMF/camera services, verified native idle status and unchanged camera
+settings, then cancelled recovery. Both GUI PIDs and the boot ID were unchanged.
+The stock module is active again; the runtime drop-in is absent. Private clips
+and native logs remain local. Runtime stderr now goes to a private trial log so
+metadata results survive service restoration.
 
 `metadata_smoke.py` separately checks the real camera-side native metadata
 getter using a fake framework callback. It verifies the 56/48-byte layouts,
