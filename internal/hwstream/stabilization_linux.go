@@ -36,6 +36,9 @@ func checkStabilizationFirmware() error {
 	for path, want := range map[string]string{
 		"/usr/lib/gstreamer-1.0/libgstdjiqmmfsrc.so":             "4c7c83e8ed5b2771fe05d53b5c2893c6802d5ce274e4e0a75d2f96bf259ab6a9",
 		"/usr/lib/camera/components/com.dji.node.eis_preview.so": "c14c9d440dc2a006503d4b3a0807b5ba4d3ee43a40edeb8d6e6f8fd13dbb8c14",
+		"/usr/lib/camera/components/com.dji.node.eis.so":         "63a3c316164610930e67b980dac75133d19b6aa7aac20a9016939ea39b97bf91",
+		"/usr/lib/camera/components/com.dji.node.imu.so":         "d56838435564604837581651f06c8993885d6a60ee99aa082cccb74c4f8fcf36",
+		"/usr/lib/hw/camera.qcom.so":                             "0439c2b5cc867ec914bc16d8ce85a49f6b849822abae780fae149133b3bb5953",
 		"/usr/lib/hw/com.qti.chi.override.so":                    "2f57a20c89b79f3e9d88921f8536facd5d1621119f2645918cacf226501231f9",
 		"/usr/lib/libalgo_share.so":                              "00339ec9b61f61fac7a3531ab143b17f99369b57b70772e9e8db012e2d631c9f",
 		"/usr/lib/gstreamer-1.0/libgstqtifcvtransform.so":        "304772b983ff28e3a69b3f84d547d1230e163964c2a5e7e00179318061582e1c",
@@ -57,6 +60,14 @@ func (s *Capture) prepareStabilization(c Config) error {
 	if z.source == 0 || z.entry == 0 {
 		return errors.New("stabilization source unavailable")
 	}
+	if err := seedInitialEIS(z.source, c); err != nil {
+		return err
+	}
+	liveIndex, inactive := 0, []int{1, 2}
+	if c.HorizonMode() {
+		// The recording solver needs the realtime preview/IMU producer alive.
+		liveIndex, inactive = 1, []int{2}
+	}
 	var setInt func(uintptr, string, int32, uintptr)
 	var setArg func(uintptr, string, string)
 	obj, e := purego.Dlopen("libgobject-2.0.so.0", purego.RTLD_NOW|purego.RTLD_LOCAL)
@@ -76,7 +87,7 @@ func (s *Capture) prepareStabilization(c Config) error {
 			return errors.New("stabilization stream role missing")
 		}
 		setInt(pad, "type", role, 0)
-		if i == 0 {
+		if i == liveIndex {
 			// The tee, CPU conversion and hardware encoder retain raw frames.
 			// Reserve enough source buffers to avoid exhausting the HAL pool.
 			setInt(pad, "extra-buffers", 16, 0)
@@ -101,7 +112,7 @@ func (s *Capture) prepareStabilization(c Config) error {
 	if gst.setState(s.pipeline, 3) == 0 {
 		return errors.New("stabilization track configuration failed")
 	}
-	for i := 1; i <= 2; i++ {
+	for _, i := range inactive {
 		pad := gst.getStaticPad(z.source, fmt.Sprintf("video_%d", i))
 		ok := gst.setPadActive(pad, 0)
 		gst.unref(pad)

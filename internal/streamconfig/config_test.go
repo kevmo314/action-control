@@ -1,6 +1,9 @@
 package streamconfig
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestRejectInvalidStreamSettings(t *testing.T) {
 	base := DefaultConfig()
@@ -152,5 +155,27 @@ func TestStabilizationProfilesRejectIncompatibleCapture(t *testing.T) {
 	c.Stabilization = "eis"
 	if c.Validate() == nil {
 		t.Fatal("generic EIS incorrectly accepted as DJI stabilization")
+	}
+}
+
+func TestHorizonCaptureUsesRecordingOutputBeforeOverlay(t *testing.T) {
+	for _, mode := range []string{"horizonsteady", "horizonbalancing"} {
+		c := DefaultConfig()
+		c.Stabilization, c.OverlayFrame = mode, "/run/scene.png"
+		pipeline := c.Pipeline(false)
+		if !strings.HasPrefix(pipeline, "djiqmmfsrc name=camera camera=0 camera.video_1 ! video/x-raw(memory:GBM),format=NV12") {
+			t.Fatalf("%s is not using the linear recording output", mode)
+		}
+		if !strings.Contains(pipeline, "camera.video_0 ! video/x-raw(memory:GBM),colorimetry=bt709,format=NV12") {
+			t.Fatalf("%s has no realtime preview producer", mode)
+		}
+		if strings.Index(pipeline, "qtifcvtransform") > strings.Index(pipeline, "gdkpixbufoverlay") {
+			t.Fatal("overlay precedes native corrected frame conversion")
+		}
+	}
+	c := DefaultConfig()
+	c.Stabilization = "rocksteady"
+	if !strings.HasPrefix(c.Pipeline(false), "djiqmmfsrc name=camera camera=0 camera.video_0 ") {
+		t.Fatal("RockSteady preview path changed")
 	}
 }

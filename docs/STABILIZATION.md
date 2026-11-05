@@ -1,9 +1,10 @@
 # DJI stabilization investigation
 
-Known limitation: the custom stream remains upside down with an inverted camera
-when HorizonSteady is selected. Native mode selection is confirmed, but full
-horizon/orientation correction is not working end to end. No manual 180-degree
-flip is installed to conceal this failure.
+HorizonSteady now corrects the camera image through DJI's recording EIS path,
+before browser overlays are composited. A crooked/inverted camera produced an
+upright preview and received SRT picture; the user confirmed the alignment.
+No software rotation or vendor-library patch is used. See the November 5 fix
+below for the initialization sequence and verification scope.
 
 Livestreaming offers **Off**, **RockSteady**, **HorizonSteady** and
 **HorizonBalancing**. Stabilized capture supports 720p, 1080p and 1440p in
@@ -21,7 +22,9 @@ separate measurement.
 ## Integrated frame and clock path
 
 The sender configures DJI's full-resolution realtime EIS graph with 4096×3072
-sensor mode 14 and a 2560×1440 preview surface. FastCV converts that linear GBM
+sensor mode 14 and 2560×1440 native surfaces. Horizon modes consume the
+main recording surface while preview remains active to feed the delayed IMU
+solver. RockSteady consumes preview. FastCV converts the selected linear GBM
 surface to RGBA and scales it to the chosen output size. Overlays blend into the
 CPU frame, then `videoconvert` produces NV12 for hardware HEVC. Studio's JPEG
 branch is independent of the encoder and shows the camera before overlay burn-in.
@@ -35,12 +38,14 @@ reserve of 16 extra source buffers accommodates the converter, tee and encoder;
 increasing that reserve alone did not fix the stall. The installed GPU
 `qtivtransform` also crashed in a probe, so this path uses CPU FastCV conversion.
 
-Steady/FOV metadata is applied after the first sensor frame. Output stays gated
+Horizon steady/FOV metadata is seeded into the initial request before camera
+open, so the recording smoother starts in the requested mode. Per-request
+metadata is also applied after the first sensor frame. Output stays gated
 for one second and until a complete HEVC keyframe arrives. Audio earlier than
 that frame is dropped, preserving the common capture timestamps. Model delay
 compensation remains upstream of this audio gate. On stop, audio is drained and
-video is allowed to reach the captured audio endpoint before EOS. Inactive main
-and proxy tracks are excluded from mux shutdown. No manual physical sync offset
+video is allowed to reach the captured audio endpoint before EOS. Inactive
+tracks are excluded from mux shutdown. No manual physical sync offset
 has been added.
 
 The setup was discovered as follows; the initial short probes below preceded
@@ -84,9 +89,9 @@ then enters an error path and can restart. Merely setting the steady tag on a
 single ordinary preview stream does not add an EIS node.
 
 With low-power preview disabled, the prototype also reached
-`DjiCommonRealtimeEISPreview` alongside `DjiCommonOfflineEISVideo`. Realtime
-preview is the useful output for streaming; the existence of an offline graph
-does not mean the streamer should use DJI's recording or livestream service.
+`DjiCommonRealtimeEISPreview` alongside `DjiCommonOfflineEISVideo`. These first probes consumed realtime preview. The corrected horizon path
+below instead consumes main video and keeps realtime preview active for IMU;
+it still uses neither DJI's recording service nor its livestream service.
 
 ## Mode and field-of-view mapping
 
@@ -213,8 +218,8 @@ Private, temporary trials found:
   both GUIs recovered; the camera did not reboot. Hardware probes stopped after
   this failure. Do not treat this graph as a validated streaming path.
 
-The next work is to understand the native video-request metadata and usecase
-rotation/gravity path before changing production capture. Overlay composition
+At this stage, the unresolved work was the native video-request metadata and
+usecase rotation/gravity path. The November 5 fix below supersedes that state. Overlay composition
 must remain downstream of the corrected camera output. The reverted software
 rotation experiment is not part of the implementation.
 
@@ -328,3 +333,60 @@ capture and the web UI were not replaced by either experimental binary. The
 next investigation is DJI's first-video-request/algorithm lifecycle and how
 to synchronize the solver mode with request metadata without repeatedly
 reinitializing filters during capture.
+
+### November 5 initial metadata and recording-path fix
+
+Two independent startup problems caused the inverted picture:
+
+1. Preview's IPE node had rotation disabled. The main recording node had it
+   enabled, so horizon output must come from `video_1` (role 2).
+2. Updating steady mode after the first frame changed node metadata but left
+   the recording smoother initialized as RockSteady. Pre-PLAYING writes to the
+   public `video-metadata` property were overwritten by source startup defaults.
+
+The sender now seeds BYTE-valued `EISSteadyMode=3` and `FovCtrlMode=2` into
+its own source's initial metadata before opening the camera. The inspected
+source serializes GstStructure buckets by namespace and typed field name.
+Its empty `org.quic.camera.anr_tuning` bucket is replaced with `com.dji.camera`
+on that source object; the source retains ownership and frees it on destruction.
+The private context offsets, expected state and empty bucket are guarded by
+full firmware fingerprints and runtime checks. Firmware, calibration and
+persistent native settings are unchanged. HorizonBalancing seeds mode 6 using
+the same mechanism; that constructor is tested, but its corrected output still
+needs a separate physical check.
+
+Main video uses linear GBM NV12. Preview (`video_0`, role 1) stays active into
+a fakesink: the delayed recording solver needs its realtime IMU producer. Only
+proxy (`video_2`) is deactivated. FastCV copies corrected main frames before
+Studio JPEG extraction and browser composition. RockSteady retains its
+previous preview path. There is no first-video-request pulse, native recording
+status override, QMMF adapter or manual image flip in this implementation.
+
+An isolated startup-serializer smoke check verified both BYTE/count-1 tags.
+Camera-side Go constructor tests verified HS/HB values without opening the
+camera. A bounded 720p local capture then yielded 263 frames over 8.779 seconds
+and passed a full sequential FFmpeg decode. Native probes observed 338 calls
+with smooth mode 1 / steady mode 3, rather than the previous steady mode 2.
+The picture was upright from the inverted camera.
+
+An integrated 1080p30 SRT run combined AAC, DJI neural processing, Studio JPEG
+preview and the saved browser overlay. Both camera-only preview and decoded
+SRT showed the corrected camera image; the browser layer remained upright.
+The user confirmed alignment with the camera left crooked. An eight-second
+trace retained 240 recording-solver calls at smooth mode 1 / steady mode 3,
+240 recording-node requests at mode 3 / FOV 2, and enabled IPE rotation on the
+recording path. QMMF retained its PID and both native GUIs remained running.
+The received clip contained 2,551 HEVC frames over 85.157 seconds at 1920×1080
+and 84.949 seconds of AAC. Full sequential video/audio decoding with
+`ffmpeg -xerror` passed. Initial audio PTS followed video by 14 ms; final packet
+ends differed by about 193 ms. These are software timestamps, not a new
+physical sync measurement. The stream stopped normally and native control
+recovered. Host race tests for stream configuration, capture and controller pass.
+
+SRT packets were transported over a temporary USB datagram relay because the
+camera's Tailscale peer was offline; no exit-node route was needed.
+
+This verifies static gravity alignment and the integrated composition path,
+not stabilization quality during motion, a complete 360-degree roll sweep,
+or new 1440p performance on the corrected recording branch. Earlier tests in
+this document predate the correction and do not prove those properties.

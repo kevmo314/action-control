@@ -32,7 +32,10 @@ func DefaultConfig() Config {
 	return Config{LatencyMS: 1000, Width: 1280, Height: 720, FPS: 30, BitrateKbps: 4000, AudioSource: "auto"}
 }
 
-func (c Config) Stabilized() bool  { return c.Stabilization != "" && c.Stabilization != "off" }
+func (c Config) Stabilized() bool { return c.Stabilization != "" && c.Stabilization != "off" }
+func (c Config) HorizonMode() bool {
+	return c.Stabilization == "horizonsteady" || c.Stabilization == "horizonbalancing"
+}
 func (c Config) NeuralAudio() bool { return c.NoiseMode() == "dji" || c.NoiseMode() == "rnnoise" }
 func (c Config) NoiseMode() string {
 	if c.NoiseReduction != "" {
@@ -142,11 +145,16 @@ func (c Config) Pipeline(testPattern bool) string {
 	cameraCaps := fmt.Sprintf("video/x-raw,format=%s,width=%d,height=%d,framerate=%d/1%s", format, c.Width, c.Height, c.FPS, colorimetry)
 	dummies := ""
 	if c.Stabilized() && !testPattern {
-		source = "djiqmmfsrc name=camera camera=0 camera.video_0"
+		live, auxiliary, compression := "video_0", "video_1", ",compression=ubwc"
+		if c.HorizonMode() {
+			live, auxiliary, compression = "video_1", "video_0", ""
+		}
+		source = "djiqmmfsrc name=camera camera=0 camera." + live
 		// Linear GBM surfaces can be copied by FastCV for CPU overlays/preview.
-		// Keep the inactive recording track UBWC to reproduce DJI's graph setup.
+		// Horizon modes consume corrected recording output while preview feeds IMU.
+		// RockSteady keeps its inactive recording track UBWC for graph selection.
 		cameraCaps = fmt.Sprintf("video/x-raw(memory:GBM),format=NV12,colorimetry=bt709,width=2560,height=1440,framerate=30/1 ! queue leaky=downstream max-size-buffers=2 max-size-bytes=0 max-size-time=0 ! qtifcvtransform ! video/x-raw,format=RGBA,width=%d,height=%d,framerate=30/1", c.Width, c.Height)
-		dummies = "camera.video_1 ! video/x-raw(memory:GBM),compression=ubwc,colorimetry=bt709,format=NV12,width=2560,height=1440,framerate=30/1 ! fakesink sync=false async=false camera.video_2 ! video/x-raw(memory:GBM),colorimetry=bt709,format=NV12,width=2560,height=1440,framerate=30/1 ! fakesink sync=false async=false "
+		dummies = fmt.Sprintf("camera.%s ! video/x-raw(memory:GBM)%s,colorimetry=bt709,format=NV12,width=2560,height=1440,framerate=30/1 ! fakesink sync=false async=false camera.video_2 ! video/x-raw(memory:GBM),colorimetry=bt709,format=NV12,width=2560,height=1440,framerate=30/1 ! fakesink sync=false async=false ", auxiliary, compression)
 	}
 	encodeConvert := ""
 	if c.Stabilized() && !testPattern {

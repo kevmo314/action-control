@@ -111,8 +111,10 @@ buffers and preview-only activation order. The prototype now reaches
 HorizonBalancing modes. Horizon modes require the linear FOV mapping; an
 unsupported fisheye combination causes the stock algorithm to assert.
 The Go sender and web UI now integrate these modes. The production path uses
-the full-resolution realtime graph and a FastCV RGBA copy before CPU overlays
-and preview. Startup waits for the mode to settle and an independently decodable
+the full-resolution graph and a FastCV RGBA copy before CPU overlays
+and preview. Horizon modes consume corrected main video, keep realtime preview
+active for IMU, and seed steady/FOV metadata before camera open so the recording
+solver initializes in the requested mode. Startup waits for the mode to settle and an independently decodable
 video frame; audio starts on that same capture timeline. See
 [native graph setup and verification](STABILIZATION.md).
 
