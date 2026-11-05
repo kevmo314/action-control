@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "gui.h"
+#include "stream_screen.h"
 #include "sha256.h"
 #include <dlfcn.h>
 #include <errno.h>
@@ -33,6 +34,16 @@ static int menu_mode;
 int ac_screen_test;
 static char state_dir[256];
 static _Atomic int attached;
+static pthread_mutex_t stream_mutex=PTHREAD_MUTEX_INITIALIZER;
+static AcStreamScreen stream_screen;
+
+int ac_stream_screen_snapshot(AcStreamScreen *out) {
+    /* The render thread must never wait for worker IO or an owned mutex. */
+    if(pthread_mutex_trylock(&stream_mutex))return 0;
+    *out=stream_screen;
+    pthread_mutex_unlock(&stream_mutex);
+    return out->sequence!=0;
+}
 
 static void load_original(void) {
     real_library=dlopen(AC_REAL_IMAGE_PLUGIN,RTLD_NOW|RTLD_LOCAL|RTLD_NODELETE);
@@ -92,7 +103,7 @@ static int post_hotspot(const char *action) {
 static int http_get(const char *path,char *buf,int cap) {
     int s=socket(AF_INET,SOCK_STREAM,0);
     if(s<0)return 0;
-    struct timeval tv={.tv_sec=12};
+    struct timeval tv={.tv_sec=2};
     setsockopt(s,SOL_SOCKET,SO_SNDTIMEO,&tv,sizeof(tv));
     setsockopt(s,SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(tv));
     struct sockaddr_in addr={.sin_family=AF_INET,.sin_port=htons(8080)};
@@ -211,7 +222,20 @@ static void *report_worker(void *unused) {
                 atomic_store(&ac_qr_ready,1);
             }
         }
-        usleep(500000);
+        if(ac_screen_test) {
+            char response[2048];AcStreamScreen next;
+            if(http_get("/api/livestream/rear-screen",response,sizeof(response))) {
+                const char *body=strstr(response,"\r\n\r\n");
+                if(body && ac_stream_screen_parse(body+4,&next)) {
+                    pthread_mutex_lock(&stream_mutex);
+                    next.sequence=stream_screen.sequence+1;
+                    if(!next.sequence)next.sequence=1;
+                    stream_screen=next;
+                    pthread_mutex_unlock(&stream_mutex);
+                }
+            }
+        }
+        usleep(ac_screen_test?1000000:500000);
     }
     return NULL;
 }

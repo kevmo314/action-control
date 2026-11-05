@@ -175,7 +175,7 @@ or horizontal overflow. A separate Go sender test verified 1080p30 Main 10
 with internal AAC audio and the wind filter. Test clips and proprietary firmware libraries are local
 research artifacts, not repository assets.
 
-## Rear display preview and temporary screen test
+## Rear display preview and SRT dashboard
 
 Studio's **Rear screen preview** reads the rear GUI graphics plane at most once
 per two seconds, on demand while the panel is open. It uses a separate bounded
@@ -185,9 +185,29 @@ service. Unsupported firmware and unstable captures return an unavailable state.
 The preview has a 180-degree rotation button. The native camera picture uses a
 separate plane and is not included in this preview.
 
-The native plugin also has an experimental `ac_mode=screen` that draws a green
-`OSMO SRT - REAR SCREEN TEST` panel with a counter on the GUI thread. This is a
-rendering test, not livestream telemetry. It is not installed by the web preview.
+The native plugin's `ac_mode=screen` displays a seven-row SRT dashboard:
+connection/error state and elapsed time, measured send Mbps versus configured
+video bitrate, SRT RTT, cumulative retransmissions and sender drops, configured
+resolution/FPS, stabilization, microphone/NR selection, and battery level and
+battery temperature. RTT is a network round trip, not glass-to-glass latency;
+configured FPS is not a measured frame rate. SRT sender drops are not receiver
+playback loss. Destinations, passphrases, stream IDs and overlay URLs are omitted.
+
+The plugin worker polls `/api/livestream/rear-screen` over loopback once per
+second, validates a bounded line protocol and publishes complete snapshots.
+The GUI thread never waits for HTTP or a mutex. A five-second-old sender status
+shows a stale warning; missing backend updates replace the panel with telemetry
+offline. Stream exit displays STOPPED even if an old status file says sending.
+The sender reads statistics from the underlying SRT connection before its
+buffered writer, so transport metrics remain available with that writer enabled.
+
+A short 1080p HorizonSteady/AAC SRT session verified live updates on the actual
+rear GUI, including changing bitrate/RTT, elapsed time and transmitted bytes.
+The stream stopped normally and the panel changed to STOPPED. No camera reboot
+or QMMF restart was needed; installing the new native renderer required one
+rear-GUI reload while idle. The panel does not add the separately planned
+on-camera Wi-Fi picker; AP bootstrapping uses the [Wi-Fi watchdog](../native/wifi/README.md).
+
 On this firmware, DJI's USB connection modal is in a separate dialog layer and
 covers the application's widgets. Moving the widget within the application does
 not place it above the modal.

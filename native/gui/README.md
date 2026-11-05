@@ -1,3 +1,19 @@
+# Rear-screen extension
+
+`ac_mode=screen` now displays live SRT telemetry rather than the original test
+counter. See [the dashboard and readback details](../../docs/STUDIO.md#rear-display-preview-and-srt-dashboard).
+The November 5 camera test verified updating bitrate, RTT, elapsed time, audio
+and HorizonSteady settings, plus the transition back to STOPPED. The bounded
+wire parser is checked with:
+
+```sh
+cc -std=c11 -O2 -Wall -Wextra -Werror native/gui/stream_screen.c native/gui/stream_screen_test.c -o /tmp/stream-screen-test
+/tmp/stream-screen-test
+```
+
+The earlier menu/QR prototype notes below describe the `ac_mode=menu` path and
+its historical trials.
+
 # 原生 GUI 实验原型
 
 状态：**后屏菜单原型已跑通；未持久安装，未对接 Action Control 后端。**

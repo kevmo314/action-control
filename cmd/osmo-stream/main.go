@@ -20,15 +20,16 @@ import (
 )
 
 type status struct {
-	AudioProcessing hwstream.ProcessorStats `json:"audio_processing"`
-	State           string                  `json:"state"`
-	Codec           string                  `json:"codec"`
-	Bytes           uint64                  `json:"bytes"`
-	StartedAt       time.Time               `json:"started_at"`
-	UpdatedAt       time.Time               `json:"updated_at"`
-	Error           string                  `json:"error,omitempty"`
-	AudioSource     string                  `json:"audio_source"`
-	AudioCodec      string                  `json:"audio_codec"`
+	Transport       *streamconfig.TransportStats `json:"transport,omitempty"`
+	AudioProcessing hwstream.ProcessorStats      `json:"audio_processing"`
+	State           string                       `json:"state"`
+	Codec           string                       `json:"codec"`
+	Bytes           uint64                       `json:"bytes"`
+	StartedAt       time.Time                    `json:"started_at"`
+	UpdatedAt       time.Time                    `json:"updated_at"`
+	Error           string                       `json:"error,omitempty"`
+	AudioSource     string                       `json:"audio_source"`
+	AudioCodec      string                       `json:"audio_codec"`
 }
 
 func main() {
@@ -75,7 +76,13 @@ func run() (err error) {
 			st.AudioCodec = "AAC-LC 48 kHz mono"
 		}
 	}
+	var connection srt.Conn
 	writeStatus := func() {
+		if connection != nil {
+			var stats srt.Statistics
+			connection.Stats(&stats)
+			st.Transport = &streamconfig.TransportStats{SendMbps: stats.Interval.MbpsSendRate, RTTMS: stats.Instantaneous.MsRTT, Retransmitted: stats.Accumulated.PktRetrans, SenderDropped: stats.Accumulated.PktSendDrop, SendBufferMS: stats.Instantaneous.MsSendBuf}
+		}
 		st.UpdatedAt = time.Now().UTC()
 		if *statusPath != "" {
 			b, _ := json.Marshal(st)
@@ -134,6 +141,7 @@ func run() (err error) {
 		return errors.New("could not connect to SRT receiver or open diagnostic output")
 	}
 	if *output == "" {
+		connection, _ = dest.(srt.Conn)
 		dest = newBufferedOutput(dest, time.Duration(c.LatencyMS)*time.Millisecond)
 	}
 	defer func() {

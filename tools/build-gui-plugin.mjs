@@ -12,7 +12,7 @@ if(version!=='0.16.0')throw new Error('GUI plugin requires Zig 0.16.0');
 const output=join(root,'.build-tools/gui-plugin');
 await mkdir(output,{recursive:true});
 const library=join(output,'libaction_control_gui.so');
-execFileSync(zig,['cc','-target','aarch64-linux-gnu.2.35','-std=c11','-O2','-fPIC','-shared','-fvisibility=hidden','-mbranch-protection=standard','-Wall','-Wextra','-Werror','-Wl,-z,relro,-z,now,-z,nodelete','-Wl,--no-undefined','-o',library,...['plugin.c','sha256.c','ui.c'].map(p=>join(root,'native/gui',p)),'-ldl','-pthread'],{stdio:'inherit'});
+execFileSync(zig,['cc','-target','aarch64-linux-gnu.2.35','-std=c11','-O2','-fPIC','-shared','-fvisibility=hidden','-mbranch-protection=standard','-Wall','-Wextra','-Werror','-Wl,-z,relro,-z,now,-z,nodelete','-Wl,--no-undefined','-o',library,...['plugin.c','sha256.c','ui.c','stream_screen.c'].map(p=>join(root,'native/gui',p)),'-ldl','-pthread'],{stdio:'inherit'});
 const data=await readFile(library);
 if(data.readUInt16LE(18)!==183 || data.readUInt16LE(16)!==3)throw new Error('Expected AArch64 shared library');
 const manifest={file:'libaction_control_gui.so',sha256:createHash('sha256').update(data).digest('hex'),size:data.length,target:'aarch64-linux-gnu.2.35',zig:version,prototype:true};

@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "gui.h"
+#include "stream_screen.h"
 #include <dlfcn.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -468,30 +469,44 @@ void ac_ui_tick(void *context,int32_t *changed) {
     root_object=root;
     uint32_t now=ew.ticks();
     if(ac_screen_test) {
-        /* Attach to the application root so the USB-connected page also shows it.
-           All EW allocations and setters stay on the native GUI thread. */
-        static void *banner,*label;
-        static uint32_t shown_second=UINT32_MAX;
-        if(!banner) {
-            banner=ew.new_object(ew.group_class,NULL);
-            ew.lock(banner);
-            ew.bounds(banner,(AcRect){24,80,688,240});
+        /* The source is the loopback backend, never native recording metadata.
+           All object work stays on the EW thread; snapshots never block it. */
+        static void *dashboard,*rows[AC_STREAM_ROWS],*stripe,*dashboard_root;
+        static uint32_t shown_second=UINT32_MAX,last_received;
+        static AcStreamScreen latest;
+        if(!dashboard) {
+            dashboard=ew.new_object(ew.group_class,NULL);
+            ew.lock(dashboard);
+            ew.bounds(dashboard,(AcRect){8,8,704,392});
             void *background=ew.new_object(ew.rectangle_class,NULL);
-            ew.bounds(background,(AcRect){0,0,664,160});
-            ew.rectangle_color(background,0xff244522);
-            ew.add(banner,background,0);
-            make_text(banner,(AcRect){8,8,656,65},"OSMO SRT - REAR SCREEN TEST",0xffffffff);
-            label=make_text(banner,(AcRect){8,75,656,145},"Starting...",0xffb5ff9c);
-            ew.add(root_object,banner,0);
+            ew.bounds(background,(AcRect){0,0,696,384});
+            ew.rectangle_color(background,0xff18130f);
+            ew.add(dashboard,background,0);
+            stripe=ew.new_object(ew.rectangle_class,NULL);
+            ew.bounds(stripe,(AcRect){0,0,6,384});
+            ew.add(dashboard,stripe,0);
+            for(int i=0;i<AC_STREAM_ROWS;i++)
+                rows[i]=make_text(dashboard,(AcRect){20,12+i*51,684,61+i*51},"",0xffeeeeee);
             atomic_store(&ac_status.panel_visible,1);
-            dump_tree();
         }
-        if(now/1000!=shown_second) {
-            char text[80];shown_second=now/1000;
-            ew.remove(root_object,banner);
-            ew.add(root_object,banner,0);
-            snprintf(text,sizeof(text),"Display test: %u seconds",shown_second);
-            ew.text_string(label,string(text));
+        if(now/1000!=shown_second || dashboard_root!=root_object) {
+            AcStreamScreen next;
+            if(ac_stream_screen_snapshot(&next) && next.sequence!=latest.sequence) {
+                latest=next;last_received=now;
+            }
+            int stale=!latest.sequence || (uint32_t)(now-last_received)>5000;
+            int severity=stale?3:latest.severity;
+            uint32_t color=severity==2?0xff83df62:severity==3?0xff7a72ff:severity==1?0xff74ceff:0xffb5b5b5;
+            const char *offline[AC_STREAM_ROWS]={"SRT TELEMETRY OFFLINE","Waiting for the web service","No current stream status available","","","","Check the web UI connection"};
+            ew.rectangle_color(stripe,color);
+            for(int i=0;i<AC_STREAM_ROWS;i++) {
+                ew.text_string(rows[i],string(stale?offline[i]:latest.lines[i]));
+                ew.text_color(rows[i],i==0?color:i==6?0xffc0b4a6:0xffeeeeee);
+            }
+            /* Bring only our panel to the front, also over the USB page. */
+            if(dashboard_root==root_object)ew.remove(dashboard_root,dashboard);
+            ew.add(root_object,dashboard,0);dashboard_root=root_object;
+            shown_second=now/1000;
             if(changed)*changed=1;
         }
         return;

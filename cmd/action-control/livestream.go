@@ -16,15 +16,16 @@ import (
 )
 
 type livestreamStatus struct {
-	AudioProcessing streamconfig.ProcessorStats `json:"audio_processing"`
-	State           string                      `json:"state"`
-	Codec           string                      `json:"codec"`
-	Bytes           uint64                      `json:"bytes"`
-	StartedAt       time.Time                   `json:"started_at"`
-	UpdatedAt       time.Time                   `json:"updated_at"`
-	Error           string                      `json:"error,omitempty"`
-	AudioSource     string                      `json:"audio_source"`
-	AudioCodec      string                      `json:"audio_codec"`
+	Transport       *streamconfig.TransportStats `json:"transport,omitempty"`
+	AudioProcessing streamconfig.ProcessorStats  `json:"audio_processing"`
+	State           string                       `json:"state"`
+	Codec           string                       `json:"codec"`
+	Bytes           uint64                       `json:"bytes"`
+	StartedAt       time.Time                    `json:"started_at"`
+	UpdatedAt       time.Time                    `json:"updated_at"`
+	Error           string                       `json:"error,omitempty"`
+	AudioSource     string                       `json:"audio_source"`
+	AudioCodec      string                       `json:"audio_codec"`
 }
 type livestreamRun struct {
 	cancel     context.CancelFunc
@@ -316,6 +317,7 @@ func registerLivestream(mux *http.ServeMux, c *cameraController) *livestreamCont
 	s := &livestreamController{camera: c, config: streamconfig.DefaultConfig(), last: livestreamStatus{State: "stopped", Codec: "H.265 / HEVC"}}
 	s.scene = registerScenes(mux, c.app)
 	registerRearScreen(mux)
+	registerStreamScreen(mux, s)
 	mux.HandleFunc("GET /api/livestream/preview.jpg", func(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		active := s.run != nil
