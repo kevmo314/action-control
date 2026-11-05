@@ -270,3 +270,61 @@ Native status and video settings matched the saved preflight after recovery.
 QMMF and camera services are back on the stock module, both GUI PIDs stayed the
 same, the boot ID did not change, and the temporary override/timer are inactive.
 The adapter is not enabled persistently and is not a validated stabilization fix.
+
+### November 5 native function instrumentation
+
+The camera has kernel uprobe support. Temporary probes in a private trace
+instance observed stock DJI functions without replacing their libraries.
+Registration used verified ELF file offsets and full module fingerprints;
+cleanup removed only owned events and the private instance. The observer is
+[`native/eis/trace_native.py`](../native/eis/trace_native.py).
+
+A guarded native settings exercise changed 1080p from 48 to 30 fps, selected
+HS, HB and RS, then restored the exact original format/EIS setting. It opened
+no recording and changed no service PID. All 3,285 trace events were retained:
+
+| Native setting | Preview node mode/FOV | Preview IPE rotation |
+| --- | --- | --- |
+| RS | 2 / 1 | disabled |
+| HS | 3 / 2 | disabled |
+| HB | 6 / 2 | disabled |
+
+The recording-node rotation publisher was not called during that preview-only
+exercise. This scopes the observation to native preview; it says nothing about
+a real native recorded clip.
+
+An instrumented production-streamer handoff showed its graph creates three IPE
+nodes. The node with stabilization value 12 had rotation/dynamic control enabled;
+the value-10 preview node and value-0 node had both disabled. All used normal
+video classification, 2560×1440 and 30 fps. The active preview capture still used
+the disabled rotation path. QMMF and both GUIs kept their original PIDs.
+
+An isolated, undeployed Go build then consumed the linear main/recording output
+instead of preview, deactivating the other two outputs. That branch received
+mode 3/FOV 2, DJI's recording publisher enabled the usecase rotation flag, and
+IPE reported requested/enabled/dynamic/output all equal to one. The picture
+remained inverted. A further 3,221-event trace explained another mismatch:
+the node mode was 3, but the processing smoother remained smooth mode 2,
+steady mode 2. Smooth mode 1 was initialized with steady mode 2 and no mode-1
+processing call was observed during that bounded capture. The active target
+quaternions stayed near identity. This is evidence of an incomplete algorithm
+transition, not proof of missing IMU hardware data or a faulty native algorithm.
+
+Offline code inspection found `IsFirstReqOfVideo` (BYTE/count-1,
+`0x80b70042`) feeds a separate recording-filter initialization path.
+`DjiRecordStatus` is INT32/count-1 at `0x80b70011`. An isolated follow-up combining
+recording status with a brief first-request hint stalled: 37 encoder-side frames
+were seen, none passed the startup gate, and the sender stopped after its
+10-second no-output deadline. QMMF's PID changed unexpectedly during recovery.
+No failure trace was retained because that private harness saved only after a
+successful child process; the public observer now saves in `finally`.
+The failure cannot be attributed to either metadata field independently, and
+the hint must not be treated as a validated request sequence.
+
+Hardware experiments stopped after that failure. Native camera control and
+original settings were restored, both GUI PIDs and boot ID remained unchanged,
+the calibration hash matched, and all probes/timers were removed. Production
+capture and the web UI were not replaced by either experimental binary. The
+next investigation is DJI's first-video-request/algorithm lifecycle and how
+to synchronize the solver mode with request metadata without repeatedly
+reinitializing filters during capture.

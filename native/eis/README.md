@@ -101,3 +101,34 @@ metadata results survive service restoration.
 getter using a fake framework callback. It verifies the 56/48-byte layouts,
 session, frame, metadata type, vendor tag, camera ID and returned data pointer.
 This check passed without opening a capture graph or changing services.
+
+## Observing the stock code without a service restart
+
+`trace_native.py` uses the camera kernel's
+[uprobe tracer](https://docs.kernel.org/trace/uprobetracer.html) to observe the
+stock preview/recording nodes, IPE startup and per-frame rotation, and motion
+smoother initialization/output. It fingerprints every probed module before
+registering private offsets. No vendor code or calibration file is included.
+
+Stage the script at `/run/action-control-eis-rotation/trace_native.py`, then run:
+
+```sh
+python3 -I -B /run/action-control-eis-rotation/trace_native.py --seconds 20
+```
+
+It observes the current camera pipeline only; change modes through an existing
+camera control while it runs. It never opens a camera, changes settings, starts
+a stream, or restarts services. It uses a private trace instance and bounded
+buffers, retains the raw trace on exit/interruption, and removes its exact
+owned events. A separate 90-second cleanup timer covers loss of the host or
+process. It leaves global tracing controls and other probes intact. Raw traces
+contain native addresses and should remain private.
+
+Native RS → HS → HB → RS transitions were captured successfully without any
+service PID changing. Preview modes changed 2 → 3 → 6 → 2, while preview IPE
+rotation stayed disabled. Separate guarded sensor-handoff trials found that
+the recording-output branch does enable IPE rotation and accepts mode 3, but
+the active smoother remained in mode 2. See
+[`docs/STABILIZATION.md`](../../docs/STABILIZATION.md) for the evidence and the
+unsuccessful initialization follow-up. The public observer has no automatic
+settings exercise or sensor-handoff command.
