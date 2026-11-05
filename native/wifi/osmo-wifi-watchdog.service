@@ -1,0 +1,16 @@
+[Unit]
+Description=Osmo saved Wi-Fi auto-reconnect
+ConditionPathExists=!/blackbox/upgrade/osmo-srt/wifi/disabled
+After=local-fs.target dji_modules_load.service dji_network.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -I -B /blackbox/upgrade/osmo-srt/wifi/watchdog.py
+Restart=on-failure
+RestartSec=10
+KillMode=control-group
+TimeoutStopSec=20
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
